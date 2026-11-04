@@ -19,6 +19,8 @@ from student_service import StudentService
 from schedule_view import ScheduleView
 from lesson_repository import LessonRepository
 from payment_repository import PaymentRepository
+from lesson_form import LessonForm, duration_minutes
+from lesson_service import LessonService
 
 
 class ApplicationController:
@@ -77,10 +79,90 @@ class ApplicationController:
                 self.main_window.family, self.load_schedule
             )
             self.schedule_view.pack(fill="both", expand=True)
+            self.lesson_form = None
+            self.schedule_view.buttons["Добавить занятие"].configure(
+                state="normal", command=self.open_lesson_form,
+                fg="white", activeforeground="white",
+                activebackground="#787878", cursor="hand2"
+            )
 
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def open_lesson_form(self):
+        """Открытие формы добавления занятия."""
+        if self.authenticator.current_user_id is None:
+            return
+        if self.lesson_form is not None:
+            self.lesson_form.lift()
+            return
+        try:
+            students = StudentRepository(self.db).get_all()
+            if not students:
+                raise ValueError("Сначала добавь активного ученика во вкладке «Ученики».")
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Занятие", str(error), parent=self.root)
+            return
+        self.lesson_form = LessonForm(
+            self.root, self.main_window.family, students,
+            self.schedule_view.monday, int(self.schedule_view.half.get()),
+            self.load_lesson_directions, self.save_lesson, self.close_lesson_form
+        )
+
+    def load_lesson_directions(self, student_id):
+        """Направления выбранного активного ученика."""
+        if self.authenticator.current_user_id is None:
+            return []
+        try:
+            student = StudentRepository(self.db).get_by_id(student_id)
+            if student is None or student.is_archived:
+                raise ValueError("Выбери активного ученика.")
+            subjects = SubjectRepository(self.db)
+            directions = EnrollmentRepository(self.db).get_by_student(student_id)
+            items = []
+            for enrollment in directions:
+                subject = subjects.get_by_id(enrollment.subject_id)
+                items.append({"enrollment": enrollment, "subject": subject[1]})
+            return items
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Занятие", str(error), parent=self.root)
+            return None
+
+    def close_lesson_form(self):
+        """Закрытие формы без сохранения."""
+        if self.lesson_form is not None:
+            self.lesson_form.destroy()
+            self.lesson_form = None
+
+    def save_lesson(self, data):
+        """Создание занятия через готовый сервис."""
+        if self.authenticator.current_user_id is None:
+            return
+        try:
+            student = StudentRepository(self.db).get_by_id(data["student_id"])
+            if student is None or student.is_archived:
+                raise ValueError("Выбери активного ученика.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(data["enrollment_id"])
+            if enrollment is None or enrollment.student_id != student.student_id:
+                raise ValueError("Это направление не принадлежит выбранному ученику.")
+            try:
+                starts_at = datetime.strptime(data["date"] + " " + data["time"], "%d.%m.%Y %H:%M")
+            except ValueError:
+                raise ValueError("Укажи дату в формате ДД.ММ.ГГГГ и время ЧЧ:ММ.")
+            duration = duration_minutes(data["hours"], data["minutes"])
+            lesson = LessonService(self.db).schedule(enrollment.enrollment_id, starts_at, duration)
+        except (sqlite3.Error, ValueError, OverflowError) as error:
+            messagebox.showerror("Занятие", str(error), parent=self.root)
+            return
+        self.close_lesson_form()
+        self.schedule_view.show_lesson(lesson)
+        amount = lesson.price_kopecks
+        money = str(amount // 100) + "," + str(amount % 100).zfill(2)
+        messagebox.showinfo(
+            "Занятие", "Занятие добавлено. Стоимость: " + money + " руб.",
+            parent=self.root
+        )
 
     def load_schedule(self, date_from, date_to):
         """Занятия, пересекающиеся с выбранной неделей."""

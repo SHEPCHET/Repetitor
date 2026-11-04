@@ -197,6 +197,16 @@ class ScheduleView(tk.Frame):
         self.selected_lesson_id = None
         self._draw()
 
+    def show_lesson(self, lesson):
+        """Переход к дате сохранённого занятия."""
+        day = lesson.starts_at.date()
+        self.year.set(str(day.year))
+        self.month.set(MONTHS[day.month - 1])
+        self._set_weeks(day)
+        self.half.set("1" if lesson.starts_at.hour < 15 else "2")
+        self.refresh()
+        self._select(lesson.lesson_id)
+
     def _select(self, lesson_id):
         self.selected_lesson_id = lesson_id
         for label, saved_id in self.labels:
