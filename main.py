@@ -7,20 +7,20 @@ from tkinter import messagebox
 from authenticator import Authenticator
 from auth_view import AuthWindow
 from database import DatabaseManager
+from main_window import MainWindow
 
 
 class ApplicationController:
-    """Связь форм с авторизацией."""
+    """Управление окнами программы."""
 
     def __init__(self, root):
         """Подключение базы и создание первого экрана."""
         self.root = root
         self.db = DatabaseManager()
         self.authenticator = Authenticator(self.db)
+        self.main_window = None
 
-        self.view = AuthWindow(
-            root, self.login, self.register
-        )
+        self.view = AuthWindow(root, self.login, self.register)
         self.view.pack(fill="both", expand=True)
 
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -42,12 +42,22 @@ class ApplicationController:
             )
 
         else:
-            messagebox.showinfo(
-                "Вход", "Вход выполнен.", parent=self.root
-            )
+            self.show_main_window()
 
         finally:
             self.view.clear_password()
+
+    def show_main_window(self):
+        """Открытие главного окна после входа."""
+        if self.authenticator.current_user_id is None:
+            return
+
+        if self.main_window is None:
+            self.main_window = MainWindow(self.root)
+
+        self.view.pack_forget()
+        self.main_window.pack(fill="both", expand=True)
+        self.root.minsize(1024, 760)
 
     def register(self, name, username, email, password, repeat):
         """Регистрация из графической формы."""
