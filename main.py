@@ -22,6 +22,8 @@ from payment_repository import PaymentRepository
 from payment_service import PaymentService
 from lesson_form import LessonForm, duration_minutes
 from lesson_service import LessonService
+from journal_service import JournalService
+from lessons_view import LessonsView
 
 
 class ApplicationController:
@@ -81,6 +83,13 @@ class ApplicationController:
             )
             self.schedule_view.pack(fill="both", expand=True)
             self.schedule_view.on_pay = self.pay_lesson
+            self.schedule_view.on_show = self.show_lesson_in_journal
+            self.lessons_view = LessonsView(
+                self.main_window.pages["Занятия"], self.main_window.family,
+                self.load_journal, self.save_journal_topics, self.pay_lesson
+            )
+            self.lessons_view.pack(fill="both", expand=True)
+            self.main_window.before_change = self.before_page_change
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
                 state="normal", command=self.add_or_delete_lesson,
@@ -103,6 +112,58 @@ class ApplicationController:
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def before_page_change(self, page):
+        """Проверка несохранённых тем перед выходом из журнала."""
+        if page != "Занятия":
+            return self.lessons_view.leave_editing()
+        return True
+
+    def load_journal(self, query="", planned=False, archived=False, silent=False):
+        """Обновление статусов и чтение выбранного журнала."""
+        if self.authenticator.current_user_id is None:
+            return []
+        try:
+            changed = LessonService(self.db).complete_finished()
+            if changed and getattr(self, "schedule_view", None) is not None:
+                self.schedule_view.refresh()
+            return JournalService(self.db).get_items(query, planned, archived)
+        except (sqlite3.Error, ValueError) as error:
+            if not silent:
+                messagebox.showerror("Занятия", str(error), parent=self.root)
+            return None
+
+    def save_journal_topics(self, changes):
+        """Сохранение изменённых ячеек тем."""
+        if self.authenticator.current_user_id is None:
+            return False
+        try:
+            JournalService(self.db).save_topics(changes)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Темы занятия", str(error), parent=self.root)
+            return False
+        messagebox.showinfo("Темы занятия", "Темы сохранены.", parent=self.root)
+        return True
+
+    def show_lesson_in_journal(self, lesson_id):
+        """Переход из расписания к нужной строке."""
+        if self.authenticator.current_user_id is None:
+            return
+        try:
+            LessonService(self.db).complete_finished()
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None or lesson.status == "Отменено":
+                raise ValueError("Занятие не найдено или отменено.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
+            student = StudentRepository(self.db).get_by_id(enrollment.student_id)
+            opened = self.lessons_view.show_lesson(
+                lesson_id, student.student_id, lesson.status == "Запланировано", student.is_archived
+            )
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Занятия", str(error), parent=self.root)
+            return
+        if opened:
+            self.main_window.show_page("Занятия")
 
     def pay_lesson(self, lesson_id):
         """Подтверждение оплаты выбранного занятия."""
@@ -139,6 +200,8 @@ class ApplicationController:
             return
         self.schedule_view.refresh()
         self.schedule_view._select(lesson_id)
+        if getattr(self, "lessons_view", None) is not None:
+            self.lessons_view.refresh()
         messagebox.showinfo("Оплата занятия", "Оплата зарегистрирована.", parent=self.root)
 
     def add_or_delete_lesson(self):
@@ -559,6 +622,9 @@ class ApplicationController:
 
     def close(self):
         """Закрытие приложения."""
+        if getattr(self, "lessons_view", None) is not None:
+            if not self.lessons_view.leave_editing():
+                return
         self.authenticator.logout()
         self.db.close()
         self.root.destroy()

@@ -88,10 +88,12 @@ class ScheduleView(tk.Frame):
         self.row_views = []
         self.cancelled_mode = False
         self.on_pay = None
+        self.on_show = None
         self.lesson_menu = tk.Menu(self, tearoff=False, font=(family, -14),
                                    bg="#d9d9d9", fg="black",
                                    activebackground="#787878", activeforeground="white")
         self.lesson_menu.add_command(label="Оплатить занятие", state="disabled")
+        self.lesson_menu.add_command(label="Показать занятие", state="disabled")
         self.selected_lesson_id = None
         today = datetime.now(timezone(timedelta(hours=3))).date()
         self.year = tk.StringVar(master=self, value=str(today.year))
@@ -302,6 +304,10 @@ class ScheduleView(tk.Frame):
         self.lesson_menu.entryconfigure(
             0, state="normal" if can_pay else "disabled",
             command=lambda: self.on_pay(lesson_id)
+        )
+        self.lesson_menu.entryconfigure(
+            1, state="normal" if self.on_show is not None and not self.cancelled_mode else "disabled",
+            command=lambda: self.on_show(lesson_id)
         )
         try:
             self.lesson_menu.tk_popup(event.x_root, event.y_root)

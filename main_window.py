@@ -10,6 +10,8 @@ class MainWindow(tk.Frame):
     def __init__(self, parent):
         """Создание главного окна."""
         super().__init__(parent, bg="white")
+        self.before_change = None
+        self.current_page = None
 
         if "Inter" in font.families(parent):
             self.family = "Inter"
@@ -75,6 +77,9 @@ class MainWindow(tk.Frame):
 
     def show_page(self, name):
         """Переход между вкладками."""
+        if self.before_change is not None and name != self.current_page:
+            if not self.before_change(name):
+                return False
         for page_name in self.pages:
             self.pages[page_name].pack_forget()
             self.buttons[page_name].configure(
@@ -90,3 +95,4 @@ class MainWindow(tk.Frame):
             borderwidth=1
         )
         self.current_page = name
+        return True
