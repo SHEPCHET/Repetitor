@@ -3,6 +3,7 @@
 import sqlite3
 import tkinter as tk
 from tkinter import messagebox
+from datetime import datetime, timedelta
 
 from authenticator import Authenticator
 from auth_view import AuthWindow
@@ -15,6 +16,9 @@ from subject_repository import SubjectRepository
 from students_view import StudentsView
 from student_form import StudentForm
 from student_service import StudentService
+from schedule_view import ScheduleView
+from lesson_repository import LessonRepository
+from payment_repository import PaymentRepository
 
 
 class ApplicationController:
@@ -68,10 +72,47 @@ class ApplicationController:
             self.students_view.edit_button.configure(command=self.edit_student)
             self.students_view.move_button.configure(command=self.move_student)
             self.student_form = None
+            self.schedule_view = ScheduleView(
+                self.main_window.pages["Расписание"],
+                self.main_window.family, self.load_schedule
+            )
+            self.schedule_view.pack(fill="both", expand=True)
 
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def load_schedule(self, date_from, date_to):
+        """Занятия, пересекающиеся с выбранной неделей."""
+        if self.authenticator.current_user_id is None:
+            return []
+        try:
+            if date_from > date_to:
+                raise ValueError("Начало периода позже его конца.")
+            start = datetime(date_from.year, date_from.month, date_from.day)
+            end = datetime(date_to.year, date_to.month, date_to.day) + timedelta(days=1)
+            lessons = LessonRepository(self.db).get_overlapping(start, end)
+            enrollments = EnrollmentRepository(self.db)
+            students = StudentRepository(self.db)
+            subjects = SubjectRepository(self.db)
+            payments = PaymentRepository(self.db)
+            items = []
+            for lesson in lessons:
+                enrollment = enrollments.get_by_id(lesson.enrollment_id)
+                student = students.get_by_id(enrollment.student_id)
+                subject = subjects.get_by_id(enrollment.subject_id)
+                items.append({
+                    "lesson": lesson,
+                    "student_name": student.full_name,
+                    "student_id": student.student_id,
+                    "subject": subject[1],
+                    "goal": enrollment.preparation_goal,
+                    "paid": payments.get_by_lesson(lesson.lesson_id) is not None
+                })
+            return items
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Расписание", str(error), parent=self.root)
+            return None
 
     def open_student_form(self):
         """Открытие формы добавления."""
