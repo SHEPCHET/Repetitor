@@ -20,7 +20,7 @@ class PaymentService:
         self.enrollment_repository = EnrollmentRepository(db)
         self.payment_repository = PaymentRepository(db)
 
-    def register_payment(self, lesson_id):
+    def register_payment(self, lesson_id, expected_amount=None):
         """Сохранение оплаты выбранного занятия."""
         if (
             not isinstance(lesson_id, int)
@@ -43,6 +43,10 @@ class PaymentService:
 
             if lesson is None:
                 raise ValueError("Занятие с таким ID не найдено.")
+            if lesson.status == "Отменено":
+                raise ValueError("Нельзя оплатить отменённое занятие.")
+            if expected_amount is not None and lesson.price_kopecks != expected_amount:
+                raise ValueError("Стоимость занятия изменилась. Проверь сумму и повтори оплату.")
 
             enrollment = self.enrollment_repository.get_by_id(
                 lesson.enrollment_id

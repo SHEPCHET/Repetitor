@@ -19,6 +19,7 @@ from student_service import StudentService
 from schedule_view import ScheduleView
 from lesson_repository import LessonRepository
 from payment_repository import PaymentRepository
+from payment_service import PaymentService
 from lesson_form import LessonForm, duration_minutes
 from lesson_service import LessonService
 
@@ -79,6 +80,7 @@ class ApplicationController:
                 self.main_window.family, self.load_schedule
             )
             self.schedule_view.pack(fill="both", expand=True)
+            self.schedule_view.on_pay = self.pay_lesson
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
                 state="normal", command=self.add_or_delete_lesson,
@@ -101,6 +103,43 @@ class ApplicationController:
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def pay_lesson(self, lesson_id):
+        """Подтверждение оплаты выбранного занятия."""
+        if self.authenticator.current_user_id is None:
+            return
+        try:
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None:
+                raise ValueError("Занятие не найдено.")
+            if lesson.status == "Отменено":
+                raise ValueError("Нельзя оплатить отменённое занятие.")
+            if PaymentRepository(self.db).get_by_lesson(lesson_id) is not None:
+                raise ValueError("Это занятие уже оплачено.")
+            if lesson.price_kopecks <= 0:
+                raise ValueError("У занятия нулевая стоимость. Оплата не требуется.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
+            student = StudentRepository(self.db).get_by_id(enrollment.student_id)
+            subject = SubjectRepository(self.db).get_by_id(enrollment.subject_id)
+            amount = lesson.price_kopecks
+            money = str(amount // 100) + "," + str(amount % 100).zfill(2)
+            text = ("Зарегистрировать оплату?\n\nУченик: " + student.full_name
+                    + "\nID ученика: " + str(student.student_id).zfill(5)
+                    + "\nПредмет: " + subject[1] + " — " + enrollment.preparation_goal
+                    + "\nЗанятие №" + str(lesson_id) + "\n"
+                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
+                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
+                    + "\nСумма: " + money + " руб."
+                    + "\n\nДата оплаты будет записана текущим московским временем.")
+            if not messagebox.askyesno("Оплатить занятие", text, parent=self.root):
+                return
+            PaymentService(self.db).register_payment(lesson_id, amount)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Оплата занятия", str(error), parent=self.root)
+            return
+        self.schedule_view.refresh()
+        self.schedule_view._select(lesson_id)
+        messagebox.showinfo("Оплата занятия", "Оплата зарегистрирована.", parent=self.root)
 
     def add_or_delete_lesson(self):
         """Действие первой кнопки расписания."""

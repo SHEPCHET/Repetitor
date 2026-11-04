@@ -87,6 +87,11 @@ class ScheduleView(tk.Frame):
         self.labels = []
         self.row_views = []
         self.cancelled_mode = False
+        self.on_pay = None
+        self.lesson_menu = tk.Menu(self, tearoff=False, font=(family, -14),
+                                   bg="#d9d9d9", fg="black",
+                                   activebackground="#787878", activeforeground="white")
+        self.lesson_menu.add_command(label="Оплатить занятие", state="disabled")
         self.selected_lesson_id = None
         today = datetime.now(timezone(timedelta(hours=3))).date()
         self.year = tk.StringVar(master=self, value=str(today.year))
@@ -284,6 +289,26 @@ class ScheduleView(tk.Frame):
         for label, saved_id in self.labels:
             label.configure(highlightthickness=3 if saved_id == lesson_id else 1)
 
+    def _show_lesson_menu(self, event, lesson_id):
+        """Оплата по правой кнопке мыши."""
+        self._select(lesson_id)
+        can_pay = False
+        for item in self.items:
+            if item["lesson"].lesson_id == lesson_id:
+                can_pay = (not self.cancelled_mode and not item["paid"]
+                           and item["lesson"].status != "Отменено"
+                           and item["lesson"].price_kopecks > 0 and self.on_pay is not None)
+                break
+        self.lesson_menu.entryconfigure(
+            0, state="normal" if can_pay else "disabled",
+            command=lambda: self.on_pay(lesson_id)
+        )
+        try:
+            self.lesson_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.lesson_menu.grab_release()
+        return "break"
+
     def _draw(self, event=None):
         """Сетка и цветные блоки занятий."""
         if not hasattr(self, "monday"):
@@ -348,6 +373,7 @@ class ScheduleView(tk.Frame):
                 )
                 label.bind("<Button-1>", lambda event, sid=lesson.lesson_id: self._select(sid))
                 label.bind("<Return>", lambda event, sid=lesson.lesson_id: self._select(sid))
+                label.bind("<Button-3>", lambda event, sid=lesson.lesson_id: self._show_lesson_menu(event, sid))
                 self.canvas.create_window(
                     70 + first * cell, 54 + row * row_height,
                     anchor="nw", window=label, width=box_width, height=row_height
