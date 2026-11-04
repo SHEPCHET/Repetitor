@@ -1,4 +1,4 @@
-"""Форма добавления занятия."""
+"""Добавление и перенос занятия."""
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -21,13 +21,14 @@ class LessonForm(tk.Frame):
     """Выбор ученика, направления и времени."""
 
     def __init__(self, parent, family, students, monday, half,
-                 load_directions, on_save, on_cancel):
+                 load_directions, on_save, on_cancel, record=None):
         super().__init__(parent, bg="#6b6b6b")
         self.family = family
         self.students = students
         self.directions = []
         self.load_directions = load_directions
         self.on_save = on_save
+        self.record = record
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -39,7 +40,7 @@ class LessonForm(tk.Frame):
         style.map(
             "Lesson.TCombobox", fieldbackground=[("readonly", "#d9d9d9")],
             background=[("active", "#d9d9d9"), ("readonly", "#d9d9d9")],
-            foreground=[("readonly", "black")],
+            foreground=[("disabled", "black"), ("readonly", "black")],
             selectbackground=[("readonly", "#d9d9d9")],
             selectforeground=[("readonly", "black")],
             bordercolor=[("focus", "#d9d9d9")],
@@ -47,8 +48,11 @@ class LessonForm(tk.Frame):
         )
         style.map("Hint.Lesson.TCombobox", foreground=[("readonly", "#6b6b6b")])
 
+        title = "Форма добавления занятия"
+        if record is not None:
+            title = "Перенос занятия"
         tk.Label(
-            self, text="Форма добавления занятия", font=(family, -24),
+            self, text=title, font=(family, -24),
             bg="#6b6b6b", fg="white", padx=0, pady=0
         ).place(x=0, y=5, width=621, height=32)
 
@@ -107,10 +111,33 @@ class LessonForm(tk.Frame):
         self.save_button = self._button("Добавить", self._save)
         self.save_button.place(x=501, y=326, width=106, height=24)
         self.save_button.configure(state="disabled")
+        if record is not None:
+            lesson = record["lesson"]
+            self.student_combo.current(0)
+            self.student_combo.configure(state="disabled", style="Lesson.TCombobox")
+            self.directions = [{"enrollment": record["enrollment"], "subject": record["subject"]}]
+            self.direction_combo.configure(
+                values=[record["subject"] + " — " + record["enrollment"].preparation_goal],
+                style="Lesson.TCombobox"
+            )
+            self.direction_combo.current(0)
+            self.direction_combo.configure(state="disabled")
+            self.date_combo.set(lesson.starts_at.strftime("%d.%m.%Y"))
+            self.time_combo.set(lesson.starts_at.strftime("%H:%M"))
+            duration = int((lesson.ends_at - lesson.starts_at).total_seconds() // 60)
+            self.hours.set(str(duration // 60))
+            self.minutes.set(str(duration % 60).zfill(2))
+            self.hours_combo.configure(state="disabled")
+            self.minutes_combo.configure(state="disabled")
+            self.save_button.configure(text="Перенести")
+            self._preview()
         self.place(relx=0.5, rely=0.5, anchor="center", width=621, height=359)
         self.update_idletasks()
         self.grab_set()
-        self.student_combo.focus_set()
+        if record is None:
+            self.student_combo.focus_set()
+        else:
+            self.date_combo.focus_set()
 
     def _combo(self, values, x, y, width, editable=False):
         state = "normal" if editable else "readonly"
@@ -158,6 +185,8 @@ class LessonForm(tk.Frame):
         try:
             duration = duration_minutes(self.hours.get(), self.minutes.get())
             amount = self.directions[index]["enrollment"].calculate_price(duration)
+            if self.record is not None:
+                amount = self.record["lesson"].price_kopecks
         except ValueError:
             return
         self.price.set(str(amount // 100) + "," + str(amount % 100).zfill(2) + " руб.")

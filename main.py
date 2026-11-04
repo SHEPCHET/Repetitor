@@ -85,6 +85,10 @@ class ApplicationController:
                 fg="white", activeforeground="white",
                 activebackground="#787878", cursor="hand2"
             )
+            self.schedule_view.buttons["Перенести занятие"].configure(
+                command=self.open_reschedule_form, fg="white",
+                activeforeground="white", activebackground="#787878", cursor="hand2"
+            )
 
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
@@ -128,6 +132,56 @@ class ApplicationController:
         except (sqlite3.Error, ValueError) as error:
             messagebox.showerror("Занятие", str(error), parent=self.root)
             return None
+
+    def open_reschedule_form(self):
+        """Перенос выбранного занятия."""
+        if self.authenticator.current_user_id is None:
+            return
+        if self.lesson_form is not None:
+            self.lesson_form.lift()
+            return
+        lesson_id = self.schedule_view.selected_lesson_id
+        if lesson_id is None:
+            return
+        try:
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None or lesson.status == "Отменено":
+                raise ValueError("Выбери занятие в расписании.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
+            student = StudentRepository(self.db).get_by_id(enrollment.student_id)
+            subject = SubjectRepository(self.db).get_by_id(enrollment.subject_id)
+            record = {"lesson": lesson, "enrollment": enrollment, "subject": subject[1]}
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Перенос занятия", str(error), parent=self.root)
+            return
+        self.lesson_form = LessonForm(
+            self.root, self.main_window.family, [student],
+            self.schedule_view.monday, int(self.schedule_view.half.get()),
+            self.load_lesson_directions,
+            lambda data: self.reschedule_lesson(lesson_id, data),
+            self.close_lesson_form, record
+        )
+
+    def reschedule_lesson(self, lesson_id, data):
+        """Смена даты и времени с прежней длительностью."""
+        if self.authenticator.current_user_id is None:
+            return
+        try:
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None or lesson.status == "Отменено":
+                raise ValueError("Занятие не найдено или отменено.")
+            try:
+                starts_at = datetime.strptime(data["date"] + " " + data["time"], "%d.%m.%Y %H:%M")
+            except ValueError:
+                raise ValueError("Укажи дату в формате ДД.ММ.ГГГГ и время ЧЧ:ММ.")
+            ends_at = starts_at + (lesson.ends_at - lesson.starts_at)
+            lesson = LessonService(self.db).reschedule(lesson_id, starts_at, ends_at)
+        except (sqlite3.Error, ValueError, OverflowError) as error:
+            messagebox.showerror("Перенос занятия", str(error), parent=self.root)
+            return
+        self.close_lesson_form()
+        self.schedule_view.show_lesson(lesson)
+        messagebox.showinfo("Перенос занятия", "Занятие перенесено.", parent=self.root)
 
     def close_lesson_form(self):
         """Закрытие формы без сохранения."""
