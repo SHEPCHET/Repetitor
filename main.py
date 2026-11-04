@@ -8,7 +8,11 @@ from authenticator import Authenticator
 from auth_view import AuthWindow
 from database import DatabaseManager
 from main_window import MainWindow
-
+from student_repository import StudentRepository
+from parent_repository import ParentRepository
+from enrollment_repository import EnrollmentRepository
+from subject_repository import SubjectRepository
+from students_view import StudentsView
 
 class ApplicationController:
     """Управление окнами программы."""
@@ -55,9 +59,52 @@ class ApplicationController:
         if self.main_window is None:
             self.main_window = MainWindow(self.root)
 
+            self.students_view = StudentsView(
+                self.main_window.pages["Ученики"],
+                self.main_window.family,
+                self.load_students
+            )
+            self.students_view.pack(fill="both", expand=True)
+
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+
+    def load_students(self, query):
+        """Данные для карточек учеников."""
+        if self.authenticator.current_user_id is None:
+            return []
+
+        try:
+            students = StudentRepository(self.db).search(query)
+            parents = ParentRepository(self.db)
+            enrollments = EnrollmentRepository(self.db)
+            subjects = SubjectRepository(self.db)
+
+            items = []
+
+            for student in students:
+                directions = []
+
+                for enrollment in enrollments.get_by_student(student.student_id):
+                    subject = subjects.get_by_id(enrollment.subject_id)
+                    directions.append((enrollment, subject[1]))
+
+                items.append({
+                    "student": student,
+                    "parents": parents.get_by_student(student.student_id),
+                    "enrollments": directions
+                })
+
+            return items
+
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror(
+                "Ученики", str(error), parent=self.root
+            )
+            return None   
+
 
     def register(self, name, username, email, password, repeat):
         """Регистрация из графической формы."""
