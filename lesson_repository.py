@@ -160,6 +160,18 @@ class LessonRepository:
             exclude_lesson_id
         ])
 
+    def get_cancelled(self, starts_at, ends_at):
+        """Отменённые занятия выбранного периода."""
+        return self._read_list("""
+            SELECT lesson_id, enrollment_id, starts_at, ends_at,
+                   price_kopecks, status
+            FROM lessons
+            WHERE status = 'Отменено'
+              AND starts_at < ? AND ends_at > ?
+            ORDER BY starts_at, lesson_id;
+        """, [ends_at.strftime("%Y-%m-%d %H:%M:%S"),
+              starts_at.strftime("%Y-%m-%d %H:%M:%S")])
+
     def get_total_completed(self, student_id, as_of=None):
         """Стоимость проведённых занятий в копейках."""
         if as_of is not None:

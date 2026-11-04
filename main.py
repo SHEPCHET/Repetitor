@@ -89,6 +89,14 @@ class ApplicationController:
                 command=self.open_reschedule_form, fg="white",
                 activeforeground="white", activebackground="#787878", cursor="hand2"
             )
+            self.schedule_view.buttons["Отменить занятие"].configure(
+                command=self.change_lesson_status, fg="white",
+                activeforeground="white", activebackground="#787878", cursor="hand2"
+            )
+            self.schedule_view.buttons["К отменённым"].configure(
+                state="normal", command=self.toggle_cancelled, fg="white",
+                activeforeground="white", activebackground="#787878", cursor="hand2"
+            )
 
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
@@ -183,6 +191,58 @@ class ApplicationController:
         self.schedule_view.show_lesson(lesson)
         messagebox.showinfo("Перенос занятия", "Занятие перенесено.", parent=self.root)
 
+    def toggle_cancelled(self):
+        """Переход к отменённым или обратно."""
+        if self.authenticator.current_user_id is not None:
+            self.schedule_view.set_cancelled_mode(not self.schedule_view.cancelled_mode)
+
+    def change_lesson_status(self):
+        if self.schedule_view.cancelled_mode:
+            self.restore_lesson()
+        else:
+            self.cancel_lesson()
+
+    def restore_lesson(self):
+        """Возврат отменённого занятия в расписание."""
+        if self.authenticator.current_user_id is None:
+            return
+        lesson_id = self.schedule_view.selected_lesson_id
+        if lesson_id is None:
+            return
+        try:
+            lesson = LessonService(self.db).restore(lesson_id)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Восстановление занятия", str(error), parent=self.root)
+            return
+        self.schedule_view.set_cancelled_mode(False)
+        self.schedule_view.show_lesson(lesson)
+        messagebox.showinfo("Восстановление занятия", "Занятие восстановлено.", parent=self.root)
+
+    def cancel_lesson(self):
+        """Отмена выбранного занятия."""
+        if self.authenticator.current_user_id is None:
+            return
+        lesson_id = self.schedule_view.selected_lesson_id
+        if lesson_id is None:
+            return
+        try:
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None or lesson.status == "Отменено":
+                raise ValueError("Выбери занятие в расписании.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
+            student = StudentRepository(self.db).get_by_id(enrollment.student_id)
+            text = ("Отменить занятие?\n\n" + student.full_name + "\n"
+                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
+                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M"))
+            if not messagebox.askyesno("Отмена занятия", text, parent=self.root):
+                return
+            LessonService(self.db).cancel(lesson_id)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Отмена занятия", str(error), parent=self.root)
+            return
+        self.schedule_view.refresh()
+        messagebox.showinfo("Отмена занятия", "Занятие отменено.", parent=self.root)
+
     def close_lesson_form(self):
         """Закрытие формы без сохранения."""
         if self.lesson_form is not None:
@@ -218,7 +278,7 @@ class ApplicationController:
             parent=self.root
         )
 
-    def load_schedule(self, date_from, date_to):
+    def load_schedule(self, date_from, date_to, cancelled=False):
         """Занятия, пересекающиеся с выбранной неделей."""
         if self.authenticator.current_user_id is None:
             return []
@@ -227,7 +287,11 @@ class ApplicationController:
                 raise ValueError("Начало периода позже его конца.")
             start = datetime(date_from.year, date_from.month, date_from.day)
             end = datetime(date_to.year, date_to.month, date_to.day) + timedelta(days=1)
-            lessons = LessonRepository(self.db).get_overlapping(start, end)
+            repository = LessonRepository(self.db)
+            if cancelled:
+                lessons = repository.get_cancelled(start, end)
+            else:
+                lessons = repository.get_overlapping(start, end)
             enrollments = EnrollmentRepository(self.db)
             students = StudentRepository(self.db)
             subjects = SubjectRepository(self.db)

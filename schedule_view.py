@@ -12,6 +12,8 @@ LEGEND_IMAGES = {
     "3": "iVBORw0KGgoAAAANSUhEUgAAACEAAAAeCAYAAACiyHcXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAADdJREFUeAHtzjEBwCAAwDA2/xZwyQ9XNcCRKMg399rjsn88QCISkYhEJCIRiUhEIhKRiEQkIpEDU9gDy1+HGJ8AAAAASUVORK5CYII="
 }
 
+CANCELLED_LEGEND_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAACEAAAAeCAYAAACiyHcXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAADZJREFUeAHtzjEBwCAAwDA2/ybAKFzVAEeiIN+ea4/L/vEAiUhEIhKRiEQkIhGJSEQiEpGIRA6VKQN9Wt7rnwAAAABJRU5ErkJggg=="
+
 MONTHS = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
@@ -33,9 +35,9 @@ def month_weeks(year, month):
     return weeks
 
 
-def lesson_parts(lesson, monday, half):
+def lesson_parts(lesson, monday, half, include_cancelled=False):
     """Видимые части занятия по дням и получасовым клеткам."""
-    if lesson.status == "Отменено":
+    if lesson.status == "Отменено" and not include_cancelled:
         return []
     first_hour = 8 if half == 1 else 15
     parts = []
@@ -54,9 +56,24 @@ def lesson_parts(lesson, monday, half):
 
 def lesson_color(lesson, paid):
     """Цвет по состоянию занятия и оплаты."""
+    if lesson.status == "Отменено":
+        return "#ffa1a2"
     if lesson.status == "Проведено":
         return "#c7fb72" if paid else "#fcccff"
     return "#9dfff4" if paid else "#f5f5f5"
+
+
+def cancelled_rows(items, monday, half):
+    """Пересекающиеся отмены размещаются друг под другом."""
+    rows = [[] for day in range(7)]
+    for item in sorted(items, key=lambda item: (item["lesson"].starts_at, item["lesson"].lesson_id)):
+        for row, first, last in lesson_parts(item["lesson"], monday, half, True):
+            lane = 0
+            while any(saved_lane == lane and first < saved_last and last > saved_first
+                      for saved_item, saved_first, saved_last, saved_lane in rows[row]):
+                lane += 1
+            rows[row].append((item, first, last, lane))
+    return rows
 
 
 class ScheduleView(tk.Frame):
@@ -68,6 +85,8 @@ class ScheduleView(tk.Frame):
         self.load_schedule = load_schedule
         self.items = []
         self.labels = []
+        self.row_views = []
+        self.cancelled_mode = False
         self.selected_lesson_id = None
         today = datetime.now(timezone(timedelta(hours=3))).date()
         self.year = tk.StringVar(master=self, value=str(today.year))
@@ -131,6 +150,7 @@ class ScheduleView(tk.Frame):
             self.buttons[text] = button
 
         self.legend = []
+        self.legend_widgets = []
         descriptions = [
             "Запланировано,\nне оплачено", "Проведено,\nне оплачено",
             "Проведено и\nоплачено", "Запланировано\nи оплачено"
@@ -138,13 +158,23 @@ class ScheduleView(tk.Frame):
         for number, text in enumerate(descriptions):
             photo = tk.PhotoImage(master=self, data=LEGEND_IMAGES[str(number)])
             self.legend.append(photo)
-            tk.Label(self, image=photo, bg="#d9d9d9", borderwidth=0, padx=0, pady=0).place(
+            swatch = tk.Label(self, image=photo, bg="#d9d9d9", borderwidth=0, padx=0, pady=0)
+            swatch.place(
                 x=6, rely=1, y=-143 + number * 35, width=33, height=30
             )
-            tk.Label(
+            caption = tk.Label(
                 self, text=text, font=(family, -12), bg="#d9d9d9",
                 anchor="center", padx=0, pady=0
-            ).place(x=42, rely=1, y=-143 + number * 35, width=114, height=30)
+            )
+            caption.place(x=42, rely=1, y=-143 + number * 35, width=114, height=30)
+            self.legend_widgets.append((swatch, caption))
+
+        self.cancelled_photo = tk.PhotoImage(master=self, data=CANCELLED_LEGEND_IMAGE)
+        self.cancelled_swatch = tk.Label(self, image=self.cancelled_photo, bg="#d9d9d9",
+                                         borderwidth=0, padx=0, pady=0)
+        self.cancelled_caption = tk.Label(
+            self, text="— Отменённое", font=(family, -12), bg="#d9d9d9", padx=0, pady=0
+        )
 
         self.canvas = tk.Canvas(self, bg="#f5f5f5", highlightthickness=0)
         self.canvas.place(x=160, y=0, relwidth=1, width=-160, relheight=1)
@@ -190,12 +220,42 @@ class ScheduleView(tk.Frame):
         if not hasattr(self, "weeks"):
             return
         self.monday = self.weeks[self.combos[2].current()]
-        items = self.load_schedule(self.monday, self.monday + timedelta(days=6))
+        if self.cancelled_mode:
+            items = self.load_schedule(self.monday, self.monday + timedelta(days=6), True)
+        else:
+            items = self.load_schedule(self.monday, self.monday + timedelta(days=6))
         if items is None:
+            self.items = []
+            self._select(None)
+            self._draw()
             return
         self.items = items
         self._select(None)
         self._draw()
+
+    def set_cancelled_mode(self, enabled):
+        """Переход между расписанием и отменёнными."""
+        self.cancelled_mode = enabled
+        texts = ["Добавить занятие", "Перенести занятие", "Отменить занятие", "К отменённым"]
+        if enabled:
+            texts = ["Удалить из истории", "Перенести\nотменённое", "Восстановить\nзанятие", "К расписанию"]
+        for button, text in zip(self.buttons.values(), texts):
+            button.configure(text=text, font=(self.family, -14 if enabled else -15), pady=0)
+        self.buttons["Добавить занятие"].configure(state="disabled" if enabled else "normal")
+        for number, (swatch, caption) in enumerate(self.legend_widgets):
+            if enabled:
+                swatch.place_forget()
+                caption.place_forget()
+            else:
+                swatch.place(x=6, rely=1, y=-143 + number * 35, width=33, height=30)
+                caption.place(x=42, rely=1, y=-143 + number * 35, width=114, height=30)
+        if enabled:
+            self.cancelled_swatch.place(x=6, rely=1, y=-143, width=33, height=30)
+            self.cancelled_caption.place(x=42, rely=1, y=-143, width=114, height=30)
+        else:
+            self.cancelled_swatch.place_forget()
+            self.cancelled_caption.place_forget()
+        self.refresh()
 
     def show_lesson(self, lesson):
         """Переход к дате сохранённого занятия."""
@@ -210,7 +270,8 @@ class ScheduleView(tk.Frame):
     def _select(self, lesson_id):
         self.selected_lesson_id = lesson_id
         state = "disabled" if lesson_id is None else "normal"
-        self.buttons["Перенести занятие"].configure(state=state)
+        self.buttons["Перенести занятие"].configure(state="disabled" if self.cancelled_mode else state)
+        self.buttons["Отменить занятие"].configure(state=state)
         for label, saved_id in self.labels:
             label.configure(highlightthickness=3 if saved_id == lesson_id else 1)
 
@@ -221,6 +282,9 @@ class ScheduleView(tk.Frame):
         for label, lesson_id in self.labels:
             label.destroy()
         self.labels = []
+        for row_view in self.row_views:
+            row_view.destroy()
+        self.row_views = []
         self.canvas.delete("all")
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
@@ -228,7 +292,7 @@ class ScheduleView(tk.Frame):
             return
         step = min(44, max(34, (height - 531) // 3))
         for number, button in enumerate(self.buttons.values()):
-            button.place_configure(y=348 + number * step)
+            button.place_configure(y=348 + number * step, height=34 if self.cancelled_mode else 30)
         cell = (width - 70) / 14
         row_height = (height - 54) / 7
         half = int(self.half.get())
@@ -251,6 +315,9 @@ class ScheduleView(tk.Frame):
                 self.canvas.create_text(35, y + 20, text=days[row], font=(self.family, -24))
                 self.canvas.create_text(35, y + 51, text=day.strftime("%d.%m"), font=(self.family, -16))
 
+        if self.cancelled_mode:
+            self._draw_cancelled(cell, row_height, half)
+            return
         for item in self.items:
             lesson = item["lesson"]
             name = item["student_name"].split()
@@ -277,3 +344,49 @@ class ScheduleView(tk.Frame):
                     anchor="nw", window=label, width=box_width, height=row_height
                 )
                 self.labels.append((label, lesson.lesson_id))
+
+    def _draw_cancelled(self, cell, row_height, half):
+        """Прокрутка отменённых внутри строки дня."""
+        for row, entries in enumerate(cancelled_rows(self.items, self.monday, half)):
+            if not entries:
+                continue
+            count = max(entry[3] for entry in entries) + 1
+            area = tk.Canvas(self.canvas, bg="#f5f5f5", highlightthickness=0,
+                             yscrollincrement=max(1, int(row_height)))
+            area.configure(scrollregion=(0, 0, 14 * cell, count * row_height))
+            self.row_views.append(area)
+            self.canvas.create_window(70, 54 + row * row_height, anchor="nw",
+                                      window=area, width=14 * cell, height=row_height)
+            for column in range(15):
+                area.create_line(column * cell, 0, column * cell, count * row_height, fill="black")
+            for lane in range(count + 1):
+                area.create_line(0, lane * row_height, 14 * cell, lane * row_height, fill="black")
+            for item, first, last, lane in entries:
+                lesson = item["lesson"]
+                text = ("\n".join(item["student_name"].split()[:2]) + "\n"
+                        + item["subject"] + "\n" + item["goal"])
+                label = tk.Label(area, text=text, font=(self.family, -14),
+                                 bg="#ffa1a2", fg="black", borderwidth=0,
+                                 highlightbackground="black", cursor="hand2", takefocus=True,
+                                 highlightthickness=3 if self.selected_lesson_id == lesson.lesson_id else 1,
+                                 wraplength=max(1, int((last - first) * cell) - 8), padx=2, pady=0)
+                label.bind("<Button-1>", lambda event, sid=lesson.lesson_id: self._select(sid))
+                label.bind("<Return>", lambda event, sid=lesson.lesson_id: self._select(sid))
+                label.bind("<MouseWheel>", lambda event, target=area: self._scroll_day(event, target))
+                area.create_window(first * cell, lane * row_height, anchor="nw", window=label,
+                                   width=(last - first) * cell, height=row_height)
+                self.labels.append((label, lesson.lesson_id))
+            area.bind("<MouseWheel>", lambda event, target=area: self._scroll_day(event, target))
+            if count > 1:
+                scrollbar = ttk.Scrollbar(area, orient="vertical", command=area.yview)
+                scrollbar.place(relx=1, x=-13, y=0, width=13, relheight=1)
+                area.configure(yscrollcommand=scrollbar.set)
+            for item, first, last, lane in entries:
+                if item["lesson"].lesson_id == self.selected_lesson_id:
+                    area.yview_moveto(lane / count)
+                    break
+
+    def _scroll_day(self, event, area):
+        if event.delta:
+            area.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        return "break"
