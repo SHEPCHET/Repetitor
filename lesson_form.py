@@ -51,6 +51,8 @@ class LessonForm(tk.Frame):
         title = "Форма добавления занятия"
         if record is not None:
             title = "Перенос занятия"
+            if record["lesson"].status == "Отменено":
+                title = "Перенос отменённого занятия"
         tk.Label(
             self, text=title, font=(family, -24),
             bg="#6b6b6b", fg="white", padx=0, pady=0

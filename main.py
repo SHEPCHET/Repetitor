@@ -151,10 +151,13 @@ class ApplicationController:
         lesson_id = self.schedule_view.selected_lesson_id
         if lesson_id is None:
             return
+        cancelled = self.schedule_view.cancelled_mode
         try:
             lesson = LessonRepository(self.db).get_by_id(lesson_id)
-            if lesson is None or lesson.status == "Отменено":
-                raise ValueError("Выбери занятие в расписании.")
+            if lesson is None:
+                raise ValueError("Занятие не найдено.")
+            if (lesson.status == "Отменено") != cancelled:
+                raise ValueError("Состояние занятия изменилось. Обнови расписание.")
             enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
             student = StudentRepository(self.db).get_by_id(enrollment.student_id)
             subject = SubjectRepository(self.db).get_by_id(enrollment.subject_id)
@@ -166,18 +169,20 @@ class ApplicationController:
             self.root, self.main_window.family, [student],
             self.schedule_view.monday, int(self.schedule_view.half.get()),
             self.load_lesson_directions,
-            lambda data: self.reschedule_lesson(lesson_id, data),
+            lambda data: self.reschedule_lesson(lesson_id, data, cancelled),
             self.close_lesson_form, record
         )
 
-    def reschedule_lesson(self, lesson_id, data):
+    def reschedule_lesson(self, lesson_id, data, cancelled=False):
         """Смена даты и времени с прежней длительностью."""
         if self.authenticator.current_user_id is None:
             return
         try:
             lesson = LessonRepository(self.db).get_by_id(lesson_id)
-            if lesson is None or lesson.status == "Отменено":
-                raise ValueError("Занятие не найдено или отменено.")
+            if lesson is None:
+                raise ValueError("Занятие не найдено.")
+            if (lesson.status == "Отменено") != cancelled:
+                raise ValueError("Состояние занятия изменилось. Обнови расписание.")
             try:
                 starts_at = datetime.strptime(data["date"] + " " + data["time"], "%d.%m.%Y %H:%M")
             except ValueError:
@@ -189,7 +194,10 @@ class ApplicationController:
             return
         self.close_lesson_form()
         self.schedule_view.show_lesson(lesson)
-        messagebox.showinfo("Перенос занятия", "Занятие перенесено.", parent=self.root)
+        text = "Занятие перенесено."
+        if cancelled:
+            text = "Дата и время изменены. Занятие осталось отменённым."
+        messagebox.showinfo("Перенос занятия", text, parent=self.root)
 
     def toggle_cancelled(self):
         """Переход к отменённым или обратно."""

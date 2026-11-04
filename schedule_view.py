@@ -270,7 +270,7 @@ class ScheduleView(tk.Frame):
     def _select(self, lesson_id):
         self.selected_lesson_id = lesson_id
         state = "disabled" if lesson_id is None else "normal"
-        self.buttons["Перенести занятие"].configure(state="disabled" if self.cancelled_mode else state)
+        self.buttons["Перенести занятие"].configure(state=state)
         self.buttons["Отменить занятие"].configure(state=state)
         for label, saved_id in self.labels:
             label.configure(highlightthickness=3 if saved_id == lesson_id else 1)
