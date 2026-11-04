@@ -81,7 +81,7 @@ class ApplicationController:
             self.schedule_view.pack(fill="both", expand=True)
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
-                state="normal", command=self.open_lesson_form,
+                state="normal", command=self.add_or_delete_lesson,
                 fg="white", activeforeground="white",
                 activebackground="#787878", cursor="hand2"
             )
@@ -101,6 +101,41 @@ class ApplicationController:
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def add_or_delete_lesson(self):
+        """Действие первой кнопки расписания."""
+        if self.schedule_view.cancelled_mode:
+            self.delete_lesson()
+        else:
+            self.open_lesson_form()
+
+    def delete_lesson(self):
+        """Удаление отменённого занятия без оплаты."""
+        if self.authenticator.current_user_id is None or not self.schedule_view.cancelled_mode:
+            return
+        lesson_id = self.schedule_view.selected_lesson_id
+        if lesson_id is None:
+            return
+        try:
+            lesson = LessonRepository(self.db).get_by_id(lesson_id)
+            if lesson is None or lesson.status != "Отменено":
+                raise ValueError("Выбери отменённое занятие.")
+            if PaymentRepository(self.db).get_by_lesson(lesson_id) is not None:
+                raise ValueError("У занятия есть оплата. Его нельзя удалить.")
+            enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
+            student = StudentRepository(self.db).get_by_id(enrollment.student_id)
+            text = ("Удалить занятие из истории?\n\n" + student.full_name + "\n"
+                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
+                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
+                    + "\n\nВосстановить запись после удаления нельзя.")
+            if not messagebox.askyesno("Удаление занятия", text, parent=self.root):
+                return
+            LessonService(self.db).delete(lesson_id)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Удаление занятия", str(error), parent=self.root)
+            return
+        self.schedule_view.refresh()
+        messagebox.showinfo("Удаление занятия", "Занятие удалено из истории.", parent=self.root)
 
     def open_lesson_form(self):
         """Открытие формы добавления занятия."""
