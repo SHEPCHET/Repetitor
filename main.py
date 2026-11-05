@@ -2,8 +2,9 @@
 
 import sqlite3
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from authenticator import Authenticator
 from auth_view import AuthWindow
@@ -26,6 +27,8 @@ from journal_service import JournalService
 from lessons_view import LessonsView
 from payment_history import PaymentHistory
 from payments_view import PaymentsView
+from reports_view import ReportsView
+from report_generator import ReportGenerator
 
 
 class ApplicationController:
@@ -96,6 +99,11 @@ class ApplicationController:
                 self.load_payments, self.show_student_journal
             )
             self.payments_view.pack(fill="both", expand=True)
+            self.reports_view = ReportsView(
+                self.main_window.pages["Отчеты"], self.main_window.family,
+                self.load_report_students, self.generate_report, self.save_generated_report
+            )
+            self.reports_view.pack(fill="both", expand=True)
             self.main_window.before_change = self.before_page_change
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
@@ -119,6 +127,71 @@ class ApplicationController:
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def load_report_students(self):
+        """Все ученики, включая архивных."""
+        if self.authenticator.current_user_id is None:
+            return []
+        try:
+            return StudentRepository(self.db).get_all(None)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Отчёты", str(error), parent=self.root)
+            return None
+
+    def generate_report(self, query, date_from, date_to):
+        """Проверка параметров и подготовка отчёта."""
+        if self.authenticator.current_user_id is None:
+            return None
+        try:
+            if not query.strip():
+                raise ValueError("Выбери ученика или введи его ФИО / ID.")
+            students = StudentRepository(self.db).search(query, None)
+            if not students:
+                raise ValueError("Ученик не найден.")
+            if len(students) > 1:
+                raise ValueError("Найдено несколько учеников. Выбери нужного из списка или введи ID.")
+            try:
+                first = datetime.strptime(date_from, "%d.%m.%Y").date()
+                last = datetime.strptime(date_to, "%d.%m.%Y").date()
+            except ValueError:
+                raise ValueError("Укажи обе даты в формате ДД.ММ.ГГГГ.")
+            if first > last:
+                raise ValueError("Начало периода позже его конца.")
+            changed = LessonService(self.db).complete_finished()
+            if changed:
+                self.schedule_view.refresh()
+                self.lessons_view.refresh()
+                self.payments_view.refresh()
+            generator = ReportGenerator(self.db)
+            data = generator.get_data(students[0].student_id, first, last)
+            return {"data": data, "text": generator.make_text(data)}
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Отчёты", str(error), parent=self.root)
+            return None
+
+    def save_generated_report(self, report, filename):
+        """Выбор папки и сохранение показанного отчёта."""
+        if self.authenticator.current_user_id is None:
+            return False
+        try:
+            if not report or not report.strip():
+                raise ValueError("Сначала сформируй отчёт.")
+            folder = Path(self.db.db_path).parent / "reports"
+            folder.mkdir(exist_ok=True)
+            path = filedialog.asksaveasfilename(
+                parent=self.root, title="Сохранить отчёт", initialdir=str(folder), initialfile=filename,
+                defaultextension=".txt", filetypes=[("Текстовый файл", "*.txt")], confirmoverwrite=True
+            )
+            if not path:
+                return False
+            if Path(path).suffix.lower() != ".txt":
+                raise ValueError("Сохрани отчёт с расширением .txt.")
+            ReportGenerator(self.db).save(report, path)
+        except (sqlite3.Error, ValueError, OSError) as error:
+            messagebox.showerror("Сохранение отчёта", str(error), parent=self.root)
+            return False
+        messagebox.showinfo("Отчёты", "Отчёт сохранён:\n" + str(path), parent=self.root)
+        return True
 
     def load_payments(self, query="", balance_mode=False):
         """История оплат или общие балансы."""
