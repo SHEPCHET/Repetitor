@@ -24,6 +24,8 @@ from lesson_form import LessonForm, duration_minutes
 from lesson_service import LessonService
 from journal_service import JournalService
 from lessons_view import LessonsView
+from payment_history import PaymentHistory
+from payments_view import PaymentsView
 
 
 class ApplicationController:
@@ -89,6 +91,11 @@ class ApplicationController:
                 self.load_journal, self.save_journal_topics, self.pay_lesson
             )
             self.lessons_view.pack(fill="both", expand=True)
+            self.payments_view = PaymentsView(
+                self.main_window.pages["Оплаты"], self.main_window.family,
+                self.load_payments, self.show_student_journal
+            )
+            self.payments_view.pack(fill="both", expand=True)
             self.main_window.before_change = self.before_page_change
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
@@ -113,6 +120,44 @@ class ApplicationController:
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
 
+    def load_payments(self, query="", balance_mode=False):
+        """История оплат или общие балансы."""
+        if self.authenticator.current_user_id is None:
+            return []
+        try:
+            changed = LessonService(self.db).complete_finished()
+            if changed:
+                self.schedule_view.refresh()
+                self.lessons_view.refresh()
+            history = PaymentHistory(self.db)
+            if balance_mode:
+                return history.get_balances(query)
+            return history.get_history(query)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Оплаты", str(error), parent=self.root)
+            return None
+
+    def show_student_journal(self, student_id):
+        """Переход от баланса к занятиям ученика."""
+        if self.authenticator.current_user_id is None:
+            return
+        try:
+            student = StudentRepository(self.db).get_by_id(student_id)
+            if student is None:
+                raise ValueError("Ученик не найден.")
+            LessonService(self.db).complete_finished()
+            journal = JournalService(self.db)
+            past = journal.get_items(str(student_id), False, student.is_archived)
+            planned = False
+            if not past:
+                planned = bool(journal.get_items(str(student_id), True, student.is_archived))
+            opened = self.lessons_view.open_student(student_id, student.is_archived, planned)
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Занятия", str(error), parent=self.root)
+            return
+        if opened:
+            self.main_window.show_page("Занятия")
+
     def before_page_change(self, page):
         """Проверка несохранённых тем перед выходом из журнала."""
         if page != "Занятия":
@@ -127,6 +172,8 @@ class ApplicationController:
             changed = LessonService(self.db).complete_finished()
             if changed and getattr(self, "schedule_view", None) is not None:
                 self.schedule_view.refresh()
+            if changed and getattr(self, "payments_view", None) is not None:
+                self.payments_view.refresh()
             return JournalService(self.db).get_items(query, planned, archived)
         except (sqlite3.Error, ValueError) as error:
             if not silent:
@@ -202,6 +249,8 @@ class ApplicationController:
         self.schedule_view._select(lesson_id)
         if getattr(self, "lessons_view", None) is not None:
             self.lessons_view.refresh()
+        if getattr(self, "payments_view", None) is not None:
+            self.payments_view.refresh()
         messagebox.showinfo("Оплата занятия", "Оплата зарегистрирована.", parent=self.root)
 
     def add_or_delete_lesson(self):

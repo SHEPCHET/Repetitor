@@ -352,6 +352,19 @@ class LessonsView(tk.Frame):
         self.editing = False
         self.refresh()
 
+    def open_student(self, student_id, archived, planned=False):
+        """История ученика из списка балансов."""
+        if not self.leave_editing():
+            return False
+        self.query.set("")
+        self.planned, self.archived = planned, archived
+        self.group_students, self.student_id = True, student_id
+        self.selected_id = None
+        self.pending_id, self.highlighted_id = None, None
+        self.refresh()
+        self.canvas.yview_moveto(0)
+        return True
+
     def show_lesson(self, lesson_id, student_id, planned, archived):
         if not self.leave_editing():
             return False
