@@ -29,6 +29,7 @@ from payment_history import PaymentHistory
 from payments_view import PaymentsView
 from reports_view import ReportsView
 from report_generator import ReportGenerator
+from settings_view import SettingsView
 
 
 class ApplicationController:
@@ -40,6 +41,7 @@ class ApplicationController:
         self.db = DatabaseManager()
         self.authenticator = Authenticator(self.db)
         self.main_window = None
+        self.lesson_form = None
         self.view = AuthWindow(root, self.login, self.register)
         self.view.pack(fill="both", expand=True)
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -104,6 +106,11 @@ class ApplicationController:
                 self.load_report_students, self.generate_report, self.save_generated_report
             )
             self.reports_view.pack(fill="both", expand=True)
+            self.settings_view = SettingsView(
+                self.main_window.pages["Настройки"], self.main_window.family,
+                self.load_account, self.change_account_password, self.create_backup, self.logout
+            )
+            self.settings_view.pack(fill="both", expand=True)
             self.main_window.before_change = self.before_page_change
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
@@ -127,6 +134,65 @@ class ApplicationController:
         self.view.pack_forget()
         self.main_window.pack(fill="both", expand=True)
         self.root.minsize(1024, 760)
+
+    def load_account(self):
+        """Сведения о текущем пользователе."""
+        if self.authenticator.current_user_id is None:
+            return None
+        try:
+            return self.authenticator.get_current_user()
+        except sqlite3.Error as error:
+            messagebox.showerror("Настройки", str(error), parent=self.root)
+            return None
+
+    def change_account_password(self, current, new, repeat):
+        """Смена пароля из настроек."""
+        if self.authenticator.current_user_id is None:
+            return False
+        try:
+            if not current or not new or not repeat:
+                raise ValueError("Заполни все три поля пароля.")
+            if new != repeat:
+                raise ValueError("Новые пароли не совпадают.")
+            if not self.authenticator.change_password(current, new):
+                raise ValueError("Текущий пароль указан неверно.")
+        except (sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Смена пароля", str(error), parent=self.root)
+            return False
+        messagebox.showinfo("Смена пароля", "Пароль изменён.", parent=self.root)
+        return True
+
+    def create_backup(self):
+        """Ручное создание резервной копии."""
+        if self.authenticator.current_user_id is None:
+            return None
+        try:
+            path = self.db.backup()
+        except (sqlite3.Error, ValueError, OSError) as error:
+            messagebox.showerror("Резервная копия", str(error), parent=self.root)
+            return None
+        messagebox.showinfo("Резервная копия", "Резервная копия создана:\n" + str(path), parent=self.root)
+        return path
+
+    def logout(self):
+        """Очистка рабочих экранов и возврат ко входу."""
+        if getattr(self, "lessons_view", None) is not None:
+            if not self.lessons_view.leave_editing():
+                return False
+        self.close_lesson_form()
+        if getattr(self, "settings_view", None) is not None:
+            self.settings_view.clear_passwords()
+        self.authenticator.logout()
+        if self.main_window is not None:
+            self.main_window.destroy()
+            self.main_window = None
+        self.student_form = None
+        for name in ["students_view", "schedule_view", "lessons_view", "payments_view", "reports_view", "settings_view"]:
+            setattr(self, name, None)
+        self.view.show_login()
+        self.view.pack(fill="both", expand=True)
+        self.root.minsize(640, 760)
+        return True
 
     def load_report_students(self):
         """Все ученики, включая архивных."""
@@ -234,7 +300,10 @@ class ApplicationController:
     def before_page_change(self, page):
         """Проверка несохранённых тем перед выходом из журнала."""
         if page != "Занятия":
-            return self.lessons_view.leave_editing()
+            if not self.lessons_view.leave_editing():
+                return False
+        if page != "Настройки" and getattr(self, "settings_view", None) is not None:
+            self.settings_view.clear_passwords()
         return True
 
     def load_journal(self, query="", planned=False, archived=False, silent=False):
