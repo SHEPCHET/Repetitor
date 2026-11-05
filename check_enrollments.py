@@ -7,7 +7,6 @@ from models import Enrollment
 from enrollment_repository import EnrollmentRepository
 from student_repository import StudentRepository
 
-
 db = DatabaseManager()
 
 try:
@@ -42,7 +41,7 @@ try:
         student_id=student_id,
         subject_id=subject_id,
         preparation_goal=goal,
-        price_60_kopecks=price_rubles * 100
+        price_60_kopecks=price_rubles * 100,
     )
 
     # Добавление и чтение

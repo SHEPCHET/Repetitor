@@ -6,7 +6,6 @@ from datetime import datetime
 from database import DatabaseManager
 from lesson_service import LessonService
 
-
 db = DatabaseManager()
 
 try:
@@ -18,10 +17,7 @@ try:
     time_text = input("Время начала (ЧЧ:ММ): ").strip()
     duration = int(input("Длительность в минутах: "))
 
-    starts_at = datetime.strptime(
-        date_text + " " + time_text,
-        "%d.%m.%Y %H:%M"
-    )
+    starts_at = datetime.strptime(date_text + " " + time_text, "%d.%m.%Y %H:%M")
 
     # Создание и сохранение
     lesson = service.schedule(enrollment_id, starts_at, duration)

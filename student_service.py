@@ -11,6 +11,7 @@ class StudentService:
     """Ученик, родители и направления обучения."""
 
     def __init__(self, db):
+        """Подготовка данных и элементов объекта."""
         self.db = db
         self.students = StudentRepository(db)
         self.parents = ParentRepository(db)
@@ -41,16 +42,22 @@ class StudentService:
         student = self.students.get_by_id(student_id)
         if student is None:
             raise ValueError("Ученик не найден.")
+
         def contact(person):
+            """Данные контакта для заполнения формы."""
             return {
                 "full_name": person.full_name,
                 "phone": person.phone or "",
                 "messenger_type": person.messenger_type or "",
-                "messenger_contact": person.messenger_contact or ""
+                "messenger_contact": person.messenger_contact or "",
             }
 
-        data = {"student_id": student.student_id, "student": contact(student),
-                "parents": [], "enrollments": []}
+        data = {
+            "student_id": student.student_id,
+            "student": contact(student),
+            "parents": [],
+            "enrollments": [],
+        }
         data["student"]["is_archived"] = student.is_archived
         for parent, is_primary in self.parents.get_by_student(student_id):
             row = contact(parent)
@@ -60,12 +67,14 @@ class StudentService:
         for enrollment in self.enrollments.get_by_student(student_id):
             subject = self.subjects.get_by_id(enrollment.subject_id)
             price = enrollment.price_60_kopecks
-            data["enrollments"].append({
-                "enrollment_id": enrollment.enrollment_id,
-                "subject_name": subject[1],
-                "preparation_goal": enrollment.preparation_goal,
-                "price": str(price // 100) + "," + str(price % 100).zfill(2)
-            })
+            data["enrollments"].append(
+                {
+                    "enrollment_id": enrollment.enrollment_id,
+                    "subject_name": subject[1],
+                    "preparation_goal": enrollment.preparation_goal,
+                    "price": str(price // 100) + "," + str(price % 100).zfill(2),
+                }
+            )
         return data
 
     def add(self, data):
@@ -74,13 +83,21 @@ class StudentService:
 
     def update(self, student_id, data):
         """Изменение существующей карточки."""
-        if not isinstance(student_id, int) or isinstance(student_id, bool) or student_id <= 0:
+        if (
+            not isinstance(student_id, int)
+            or isinstance(student_id, bool)
+            or student_id <= 0
+        ):
             raise ValueError("Неверный ID ученика.")
         return self._save(data, student_id)
 
     def set_archived(self, student_id, archived):
         """Перемещение в архив или восстановление."""
-        if not isinstance(student_id, int) or isinstance(student_id, bool) or student_id <= 0:
+        if (
+            not isinstance(student_id, int)
+            or isinstance(student_id, bool)
+            or student_id <= 0
+        ):
             raise ValueError("Неверный ID ученика.")
         if not isinstance(archived, bool):
             raise ValueError("Неверный признак архива.")
@@ -102,9 +119,12 @@ class StudentService:
         """Общая проверка и запись карточки."""
         values = self._contact(data["student"])
         student = Student(
-            values[0], student_id=student_id, phone=values[1], messenger_type=values[2],
+            values[0],
+            student_id=student_id,
+            phone=values[1],
+            messenger_type=values[2],
             messenger_contact=values[3],
-            is_archived=data["student"]["is_archived"]
+            is_archived=data["student"]["is_archived"],
         )
 
         parents = []
@@ -114,8 +134,11 @@ class StudentService:
             if not any(values):
                 continue
             parent = Parent(
-                values[0], parent_id=row.get("parent_id"), phone=values[1], messenger_type=values[2],
-                messenger_contact=values[3]
+                values[0],
+                parent_id=row.get("parent_id"),
+                phone=values[1],
+                messenger_type=values[2],
+                messenger_contact=values[3],
             )
             primary_count += int(row["is_primary"])
             parents.append((parent, row["is_primary"]))
@@ -132,8 +155,11 @@ class StudentService:
             if name == "":
                 raise ValueError("Введи название предмета в заполненном направлении.")
             enrollment = Enrollment(
-                student_id, None, goal, self._price(price),
-                enrollment_id=row.get("enrollment_id")
+                student_id,
+                None,
+                goal,
+                self._price(price),
+                enrollment_id=row.get("enrollment_id"),
             )
             directions.append((name, enrollment))
 
@@ -188,10 +214,13 @@ class StudentService:
         """Проверка принадлежности записей ученику."""
         if self.students.get_by_id(student_id) is None:
             raise ValueError("Ученик не найден.")
-        saved_parents = [parent.parent_id for parent, primary
-                         in self.parents.get_by_student(student_id)]
-        saved_directions = [row.enrollment_id
-                            for row in self.enrollments.get_by_student(student_id)]
+        saved_parents = [
+            parent.parent_id
+            for parent, primary in self.parents.get_by_student(student_id)
+        ]
+        saved_directions = [
+            row.enrollment_id for row in self.enrollments.get_by_student(student_id)
+        ]
         used = []
         for parent, primary in parents:
             if parent.parent_id is not None:
@@ -201,6 +230,9 @@ class StudentService:
         used = []
         for name, enrollment in directions:
             if enrollment.enrollment_id is not None:
-                if enrollment.enrollment_id not in saved_directions or enrollment.enrollment_id in used:
+                if (
+                    enrollment.enrollment_id not in saved_directions
+                    or enrollment.enrollment_id in used
+                ):
                     raise ValueError("Неверное направление в карточке ученика.")
                 used.append(enrollment.enrollment_id)

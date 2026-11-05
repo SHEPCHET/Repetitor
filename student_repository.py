@@ -23,7 +23,7 @@ class StudentRepository:
             phone=row[2],
             messenger_type=row[3],
             messenger_contact=row[4],
-            is_archived=bool(row[5])
+            is_archived=bool(row[5]),
         )
 
     def _check_student(self, student):
@@ -43,42 +43,51 @@ class StudentRepository:
         if student.student_id is not None:
             raise ValueError("У нового ученика ещё не должно быть ID.")
 
-        cursor = self.db.connection.execute("""
+        cursor = self.db.connection.execute(
+            """
             INSERT INTO students (
                 full_name, phone, messenger_type,
                 messenger_contact, is_archived
             )
             VALUES (?, ?, ?, ?, ?);
-        """, [
-            student.full_name,
-            student.phone,
-            student.messenger_type,
-            student.messenger_contact,
-            int(student.is_archived)
-        ])
+        """,
+            [
+                student.full_name,
+                student.phone,
+                student.messenger_type,
+                student.messenger_contact,
+                int(student.is_archived),
+            ],
+        )
 
         student.student_id = cursor.lastrowid
 
     def get_by_id(self, student_id):
         """Получение ученика по ID или None, если его нет."""
-        row = self.db.connection.execute("""
+        row = self.db.connection.execute(
+            """
             SELECT student_id, full_name, phone,
                    messenger_type, messenger_contact, is_archived
             FROM students
             WHERE student_id = ?;
-        """, [student_id]).fetchone()
+        """,
+            [student_id],
+        ).fetchone()
 
         return self._make_student(row)
 
     def get_all(self, is_archived=False):
         """Список учеников: False — активные, True — архив, None — все."""
-        rows = self.db.connection.execute("""
+        rows = self.db.connection.execute(
+            """
             SELECT student_id, full_name, phone,
                    messenger_type, messenger_contact, is_archived
             FROM students
             WHERE (? IS NULL OR is_archived = ?)
             ORDER BY full_name, student_id;
-        """, [is_archived, is_archived]).fetchall()
+        """,
+            [is_archived, is_archived],
+        ).fetchall()
 
         students = []
         for row in rows:
@@ -93,19 +102,22 @@ class StudentRepository:
         if student.student_id is None:
             raise ValueError("Для изменения ученика нужен его ID.")
 
-        cursor = self.db.connection.execute("""
+        cursor = self.db.connection.execute(
+            """
             UPDATE students
             SET full_name = ?, phone = ?, messenger_type = ?,
                 messenger_contact = ?, is_archived = ?
             WHERE student_id = ?;
-        """, [
-            student.full_name,
-            student.phone,
-            student.messenger_type,
-            student.messenger_contact,
-            int(student.is_archived),
-            student.student_id
-        ])
+        """,
+            [
+                student.full_name,
+                student.phone,
+                student.messenger_type,
+                student.messenger_contact,
+                int(student.is_archived),
+                student.student_id,
+            ],
+        )
 
         if cursor.rowcount == 0:
             raise ValueError("Ученик с таким ID не найден.")

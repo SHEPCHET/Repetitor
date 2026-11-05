@@ -7,3 +7,5 @@ __pycache__/
 *.sqlite3
 backups/
 reports/
+.login_session.json
+.login_session-*.tmp

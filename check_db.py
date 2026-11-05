@@ -13,11 +13,14 @@ subject_name = "Математика"
 
 try:
     # Добавление предмета
-    connection.execute("""
+    connection.execute(
+        """
         INSERT INTO subjects (name)
         VALUES (?)
         ON CONFLICT(name) DO NOTHING;
-    """, [subject_name])
+    """,
+        [subject_name],
+    )
 
     connection.commit()
 

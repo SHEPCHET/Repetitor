@@ -25,9 +25,7 @@ class LessonService:
     def _begin(self):
         """Начало отдельной операции."""
         if self.db.connection.in_transaction:
-            raise ValueError(
-                "Сначала сохрани или отмени предыдущие изменения."
-            )
+            raise ValueError("Сначала сохрани или отмени предыдущие изменения.")
 
         self.db.connection.execute("BEGIN IMMEDIATE;")
 
@@ -57,15 +55,11 @@ class LessonService:
             return
 
         overlapping = self.lesson_repository.get_overlapping(
-            lesson.starts_at,
-            lesson.ends_at,
-            lesson.lesson_id
+            lesson.starts_at, lesson.ends_at, lesson.lesson_id
         )
 
         if overlapping:
-            raise ValueError(
-                "На это время уже назначено другое занятие."
-            )
+            raise ValueError("На это время уже назначено другое занятие.")
 
     def _set_current_status(self, lesson):
         """Определение статуса по времени окончания."""
@@ -90,7 +84,7 @@ class LessonService:
                 enrollment_id=enrollment_id,
                 starts_at=starts_at,
                 ends_at=starts_at + timedelta(minutes=duration_minutes),
-                price_kopecks=price
+                price_kopecks=price,
             )
 
             self._set_current_status(lesson)
@@ -174,10 +168,7 @@ class LessonService:
             count = 0
 
             for lesson in self.lesson_repository.get_by_student():
-                if (
-                    lesson.status == "Запланировано"
-                    and lesson.ends_at <= now
-                ):
+                if lesson.status == "Запланировано" and lesson.ends_at <= now:
                     lesson.complete()
                     self.lesson_repository.update(lesson)
                     count += 1

@@ -24,21 +24,14 @@ class MainWindow(tk.Frame):
             font=(self.family, -24),
             bg="white",
             fg="black",
-            borderwidth=0
+            borderwidth=0,
         )
         title.place(relx=0.5, y=0, anchor="n", height=30)
 
         self.content = tk.Frame(
-            self,
-            bg="#d9d9d9",
-            highlightbackground="black",
-            highlightthickness=1
+            self, bg="#d9d9d9", highlightbackground="black", highlightthickness=1
         )
-        self.content.place(
-            x=36, y=76,
-            relwidth=1, width=-80,
-            relheight=1, height=-116
-        )
+        self.content.place(x=36, y=76, relwidth=1, width=-80, relheight=1, height=-116)
 
         tabs = [
             ("Расписание", 36, 162),
@@ -46,7 +39,7 @@ class MainWindow(tk.Frame):
             ("Занятия", 356, 142),
             ("Оплаты", 511, 119),
             ("Отчеты", 646, 120),
-            ("Настройки", 780, 170)
+            ("Настройки", 780, 170),
         ]
 
         self.buttons = {}
@@ -65,7 +58,7 @@ class MainWindow(tk.Frame):
                 borderwidth=0,
                 highlightthickness=0,
                 cursor="hand2",
-                command=lambda page=name: self.show_page(page)
+                command=lambda page=name: self.show_page(page),
             )
             button.place(x=x, y=33, width=width, height=43)
             self.buttons[name] = button
@@ -82,17 +75,9 @@ class MainWindow(tk.Frame):
                 return False
         for page_name in self.pages:
             self.pages[page_name].pack_forget()
-            self.buttons[page_name].configure(
-                bg="white",
-                relief="flat",
-                borderwidth=0
-            )
+            self.buttons[page_name].configure(bg="white", relief="flat", borderwidth=0)
 
         self.pages[name].pack(fill="both", expand=True)
-        self.buttons[name].configure(
-            bg="#d9d9d9",
-            relief="solid",
-            borderwidth=1
-        )
+        self.buttons[name].configure(bg="#d9d9d9", relief="solid", borderwidth=1)
         self.current_page = name
         return True

@@ -11,7 +11,7 @@ class Student:
         phone=None,
         messenger_type=None,
         messenger_contact=None,
-        is_archived=False
+        is_archived=False,
     ):
         """Заполнение данных ученика."""
         full_name = full_name.strip()
@@ -34,6 +34,7 @@ class Student:
         """Восстановление из архива."""
         self.is_archived = False
 
+
 class Parent:
     """Данные родителя."""
 
@@ -43,7 +44,7 @@ class Parent:
         parent_id=None,
         phone=None,
         messenger_type=None,
-        messenger_contact=None
+        messenger_contact=None,
     ):
         """Заполнение данных родителя."""
         full_name = full_name.strip()
@@ -67,7 +68,7 @@ class Enrollment:
         subject_id,
         preparation_goal,
         price_60_kopecks,
-        enrollment_id=None
+        enrollment_id=None,
     ):
         """Предмет, цель подготовки и цена."""
         if (
@@ -100,13 +101,13 @@ class Enrollment:
             or duration_minutes <= 0
             or duration_minutes % 30 != 0
         ):
-            raise ValueError(
-                "Нужно целое число минут, больше 0 и кратное 30."
-            )
+            raise ValueError("Нужно целое число минут, больше 0 и кратное 30.")
 
         # Округление до целой копейки
         total = self.price_60_kopecks * duration_minutes
         return (total + 30) // 60
+
+
 # Проверка класса
 if __name__ == "__main__":
     student = Student("Тестовый ученик")
@@ -123,10 +124,7 @@ if __name__ == "__main__":
     print("Родитель:", parent.full_name)
 
     enrollment = Enrollment(
-        student_id=1,
-        subject_id=1,
-        preparation_goal="ЕГЭ",
-        price_60_kopecks=140000
+        student_id=1, subject_id=1, preparation_goal="ЕГЭ", price_60_kopecks=140000
     )
 
     print("30 минут:", enrollment.calculate_price(30), "коп.")

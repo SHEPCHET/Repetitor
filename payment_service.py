@@ -27,14 +27,10 @@ class PaymentService:
             or isinstance(lesson_id, bool)
             or lesson_id <= 0
         ):
-            raise ValueError(
-                "ID занятия должен быть целым числом больше 0."
-            )
+            raise ValueError("ID занятия должен быть целым числом больше 0.")
 
         if self.db.connection.in_transaction:
-            raise ValueError(
-                "Сначала сохрани или отмени предыдущие изменения."
-            )
+            raise ValueError("Сначала сохрани или отмени предыдущие изменения.")
 
         self.db.connection.execute("BEGIN IMMEDIATE;")
 
@@ -46,27 +42,24 @@ class PaymentService:
             if lesson.status == "Отменено":
                 raise ValueError("Нельзя оплатить отменённое занятие.")
             if expected_amount is not None and lesson.price_kopecks != expected_amount:
-                raise ValueError("Стоимость занятия изменилась. Проверь сумму и повтори оплату.")
+                raise ValueError(
+                    "Стоимость занятия изменилась. Проверь сумму и повтори оплату."
+                )
 
-            enrollment = self.enrollment_repository.get_by_id(
-                lesson.enrollment_id
-            )
+            enrollment = self.enrollment_repository.get_by_id(lesson.enrollment_id)
 
             if enrollment is None:
                 raise ValueError("Направление обучения не найдено.")
 
             # Текущее московское время
             moscow = timezone(timedelta(hours=3))
-            paid_at = datetime.now(moscow).replace(
-                tzinfo=None,
-                microsecond=0
-            )
+            paid_at = datetime.now(moscow).replace(tzinfo=None, microsecond=0)
 
             payment = Payment(
                 student_id=enrollment.student_id,
                 lesson_id=lesson.lesson_id,
                 paid_at=paid_at,
-                amount_kopecks=lesson.price_kopecks
+                amount_kopecks=lesson.price_kopecks,
             )
 
             self.payment_repository.add(payment)
@@ -87,10 +80,7 @@ if __name__ == "__main__":
         print("ID ученика:", payment.student_id)
         print("ID занятия:", payment.lesson_id)
         print("Сумма:", payment.amount_kopecks, "коп.")
-        print(
-            "Дата оплаты:",
-            payment.paid_at.strftime("%d.%m.%Y %H:%M:%S")
-        )
+        print("Дата оплаты:", payment.paid_at.strftime("%d.%m.%Y %H:%M:%S"))
 
     except (sqlite3.Error, ValueError) as error:
         print("Ошибка:", error)

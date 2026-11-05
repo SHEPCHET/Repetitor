@@ -14,7 +14,7 @@ class Lesson:
         price_kopecks,
         lesson_id=None,
         status="Запланировано",
-        topics=None
+        topics=None,
     ):
         """Заполнение данных занятия."""
         self.lesson_id = lesson_id
@@ -34,23 +34,14 @@ class Lesson:
     def validate(self):
         """Проверка данных занятия."""
         if not isinstance(self.starts_at, datetime):
-            raise ValueError(
-                "Начало занятия должно содержать дату и время."
-            )
+            raise ValueError("Начало занятия должно содержать дату и время.")
 
         if not isinstance(self.ends_at, datetime):
-            raise ValueError(
-                "Конец занятия должен содержать дату и время."
-            )
+            raise ValueError("Конец занятия должен содержать дату и время.")
 
         # Время указываем по Москве
-        if (
-            self.starts_at.tzinfo is not None
-            or self.ends_at.tzinfo is not None
-        ):
-            raise ValueError(
-                "Укажи московское время без часового пояса в объекте."
-            )
+        if self.starts_at.tzinfo is not None or self.ends_at.tzinfo is not None:
+            raise ValueError("Укажи московское время без часового пояса в объекте.")
 
         if (
             self.starts_at.second != 0
@@ -58,34 +49,24 @@ class Lesson:
             or self.ends_at.second != 0
             or self.ends_at.microsecond != 0
         ):
-            raise ValueError(
-                "Время нужно указывать с точностью до минуты."
-            )
+            raise ValueError("Время нужно указывать с точностью до минуты.")
 
         if self.starts_at.minute not in (0, 30):
-            raise ValueError(
-                "Занятие должно начинаться в 00 или 30 минут."
-            )
+            raise ValueError("Занятие должно начинаться в 00 или 30 минут.")
 
         duration = (self.ends_at - self.starts_at).total_seconds()
 
         if duration <= 0 or duration % 1800 != 0:
-            raise ValueError(
-                "Длительность должна быть больше 0 и кратна 30 минутам."
-            )
+            raise ValueError("Длительность должна быть больше 0 и кратна 30 минутам.")
 
         if (
             not isinstance(self.price_kopecks, int)
             or isinstance(self.price_kopecks, bool)
             or self.price_kopecks < 0
         ):
-            raise ValueError(
-                "Цена должна быть целым числом копеек от 0."
-            )
+            raise ValueError("Цена должна быть целым числом копеек от 0.")
 
-        if self.status not in (
-            "Запланировано", "Проведено", "Отменено"
-        ):
+        if self.status not in ("Запланировано", "Проведено", "Отменено"):
             raise ValueError("Неизвестный статус занятия.")
 
         if not isinstance(self.topics, list):
@@ -96,9 +77,7 @@ class Lesson:
 
         for topic in self.topics:
             if not isinstance(topic, str) or topic.strip() == "":
-                raise ValueError(
-                    "Название темы не должно быть пустым."
-                )
+                raise ValueError("Название темы не должно быть пустым.")
 
             topics.append(topic.strip())
 
@@ -107,9 +86,7 @@ class Lesson:
     def complete(self):
         """Отметка о проведении занятия."""
         if self.status == "Отменено":
-            raise ValueError(
-                "Сначала восстанови отменённое занятие."
-            )
+            raise ValueError("Сначала восстанови отменённое занятие.")
 
         self.status = "Проведено"
 
@@ -131,7 +108,7 @@ if __name__ == "__main__":
         enrollment_id=1,
         starts_at=datetime(2026, 11, 10, 10, 0),
         ends_at=datetime(2026, 11, 10, 11, 0),
-        price_kopecks=140000
+        price_kopecks=140000,
     )
 
     print("Начало:", lesson.starts_at.strftime("%d.%m.%Y %H:%M"))

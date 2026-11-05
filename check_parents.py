@@ -7,7 +7,6 @@ from models import Parent
 from parent_repository import ParentRepository
 from student_repository import StudentRepository
 
-
 db = DatabaseManager()
 
 try:

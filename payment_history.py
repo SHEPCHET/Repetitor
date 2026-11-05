@@ -9,7 +9,10 @@ from payment_repository import PaymentRepository
 
 
 class PaymentHistory:
+    """Получение истории оплат и балансов учеников."""
+
     def __init__(self, db):
+        """Подготовка данных и элементов объекта."""
         self.db = db
 
     def get_history(self, query=""):
@@ -26,9 +29,15 @@ class PaymentHistory:
                 continue
             lesson = lessons.get_by_id(payment.lesson_id)
             enrollment = enrollments.get_by_id(lesson.enrollment_id)
-            items.append({"payment": payment, "student": students[payment.student_id],
-                          "lesson": lesson, "subject": subjects.get_by_id(enrollment.subject_id)[1],
-                          "goal": enrollment.preparation_goal})
+            items.append(
+                {
+                    "payment": payment,
+                    "student": students[payment.student_id],
+                    "lesson": lesson,
+                    "subject": subjects.get_by_id(enrollment.subject_id)[1],
+                    "goal": enrollment.preparation_goal,
+                }
+            )
         return items
 
     def get_balances(self, query=""):
@@ -36,5 +45,7 @@ class PaymentHistory:
         billing = BillingService(self.db)
         items = []
         for student in StudentRepository(self.db).search(query, None):
-            items.append({"student": student, "summary": billing.get_summary(student.student_id)})
+            items.append(
+                {"student": student, "summary": billing.get_summary(student.student_id)}
+            )
         return items

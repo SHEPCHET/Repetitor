@@ -25,16 +25,10 @@ class BillingService:
 
         if as_of is not None:
             if not isinstance(as_of, date) or isinstance(as_of, datetime):
-                raise ValueError(
-                    "Дата расчёта должна быть объектом date."
-                )
+                raise ValueError("Дата расчёта должна быть объектом date.")
 
-        charged = self.lesson_repository.get_total_completed(
-            student_id, as_of
-        )
-        received = self.payment_repository.get_total(
-            student_id, as_of
-        )
+        charged = self.lesson_repository.get_total_completed(student_id, as_of)
+        received = self.payment_repository.get_total(student_id, as_of)
 
         balance = charged - received
         debt = 0
@@ -50,7 +44,7 @@ class BillingService:
             "received": received,
             "balance": balance,
             "debt": debt,
-            "advance": advance
+            "advance": advance,
         }
 
     def calculate_balance(self, student_id, as_of=None):

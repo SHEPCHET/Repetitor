@@ -30,6 +30,7 @@ from payments_view import PaymentsView
 from reports_view import ReportsView
 from report_generator import ReportGenerator
 from settings_view import SettingsView
+from remembered_login import RememberedLogin
 
 
 class ApplicationController:
@@ -40,11 +41,20 @@ class ApplicationController:
         self.root = root
         self.db = DatabaseManager()
         self.authenticator = Authenticator(self.db)
+        self.saved_login = RememberedLogin(self.db)
         self.main_window = None
         self.lesson_form = None
+        self.backup_due = False
         self.view = AuthWindow(root, self.login, self.register)
         self.view.pack(fill="both", expand=True)
         root.protocol("WM_DELETE_WINDOW", self.close)
+
+        # Вход при повторном запуске
+        user_id = self.saved_login.restore()
+        if user_id is not None:
+            self.authenticator.current_user_id = user_id
+            self.backup_due = True
+            self.show_main_window()
 
     def login(self, username, password):
         """Проверка данных из формы входа."""
@@ -60,10 +70,24 @@ class ApplicationController:
             messagebox.showerror("Вход", str(error), parent=self.root)
 
         else:
+            self.backup_due = True
+            self.remember_login()
             self.show_main_window()
 
         finally:
             self.view.clear_password()
+
+    def remember_login(self):
+        """Запоминание текущего аккаунта."""
+        try:
+            self.saved_login.remember(self.authenticator.current_user_id)
+        except (sqlite3.Error, OSError, ValueError) as error:
+            messagebox.showwarning(
+                "Сохранение входа",
+                "Не удалось запомнить аккаунт. При следующем запуске войди вручную.\n"
+                + str(error),
+                parent=self.root,
+            )
 
     def show_main_window(self):
         """Открытие главного окна после входа."""
@@ -75,7 +99,7 @@ class ApplicationController:
             self.students_view = StudentsView(
                 self.main_window.pages["Ученики"],
                 self.main_window.family,
-                self.load_students
+                self.load_students,
             )
             self.students_view.pack(fill="both", expand=True)
             self.students_view.add_button.configure(
@@ -86,49 +110,75 @@ class ApplicationController:
             self.student_form = None
             self.schedule_view = ScheduleView(
                 self.main_window.pages["Расписание"],
-                self.main_window.family, self.load_schedule
+                self.main_window.family,
+                self.load_schedule,
             )
             self.schedule_view.pack(fill="both", expand=True)
             self.schedule_view.on_pay = self.pay_lesson
             self.schedule_view.on_show = self.show_lesson_in_journal
             self.lessons_view = LessonsView(
-                self.main_window.pages["Занятия"], self.main_window.family,
-                self.load_journal, self.save_journal_topics, self.pay_lesson
+                self.main_window.pages["Занятия"],
+                self.main_window.family,
+                self.load_journal,
+                self.save_journal_topics,
+                self.pay_lesson,
             )
             self.lessons_view.pack(fill="both", expand=True)
             self.payments_view = PaymentsView(
-                self.main_window.pages["Оплаты"], self.main_window.family,
-                self.load_payments, self.show_student_journal
+                self.main_window.pages["Оплаты"],
+                self.main_window.family,
+                self.load_payments,
+                self.show_student_journal,
             )
             self.payments_view.pack(fill="both", expand=True)
             self.reports_view = ReportsView(
-                self.main_window.pages["Отчеты"], self.main_window.family,
-                self.load_report_students, self.generate_report, self.save_generated_report
+                self.main_window.pages["Отчеты"],
+                self.main_window.family,
+                self.load_report_students,
+                self.generate_report,
+                self.save_generated_report,
             )
             self.reports_view.pack(fill="both", expand=True)
             self.settings_view = SettingsView(
-                self.main_window.pages["Настройки"], self.main_window.family,
-                self.load_account, self.change_account_password, self.create_backup, self.logout
+                self.main_window.pages["Настройки"],
+                self.main_window.family,
+                self.load_account,
+                self.change_account_password,
+                self.create_backup,
+                self.logout,
             )
             self.settings_view.pack(fill="both", expand=True)
             self.main_window.before_change = self.before_page_change
             self.lesson_form = None
             self.schedule_view.buttons["Добавить занятие"].configure(
-                state="normal", command=self.add_or_delete_lesson,
-                fg="white", activeforeground="white",
-                activebackground="#787878", cursor="hand2"
+                state="normal",
+                command=self.add_or_delete_lesson,
+                fg="white",
+                activeforeground="white",
+                activebackground="#787878",
+                cursor="hand2",
             )
             self.schedule_view.buttons["Перенести занятие"].configure(
-                command=self.open_reschedule_form, fg="white",
-                activeforeground="white", activebackground="#787878", cursor="hand2"
+                command=self.open_reschedule_form,
+                fg="white",
+                activeforeground="white",
+                activebackground="#787878",
+                cursor="hand2",
             )
             self.schedule_view.buttons["Отменить занятие"].configure(
-                command=self.change_lesson_status, fg="white",
-                activeforeground="white", activebackground="#787878", cursor="hand2"
+                command=self.change_lesson_status,
+                fg="white",
+                activeforeground="white",
+                activebackground="#787878",
+                cursor="hand2",
             )
             self.schedule_view.buttons["К отменённым"].configure(
-                state="normal", command=self.toggle_cancelled, fg="white",
-                activeforeground="white", activebackground="#787878", cursor="hand2"
+                state="normal",
+                command=self.toggle_cancelled,
+                fg="white",
+                activeforeground="white",
+                activebackground="#787878",
+                cursor="hand2",
             )
 
         self.view.pack_forget()
@@ -160,6 +210,7 @@ class ApplicationController:
             messagebox.showerror("Смена пароля", str(error), parent=self.root)
             return False
         messagebox.showinfo("Смена пароля", "Пароль изменён.", parent=self.root)
+        self.remember_login()
         return True
 
     def create_backup(self):
@@ -171,7 +222,11 @@ class ApplicationController:
         except (sqlite3.Error, ValueError, OSError) as error:
             messagebox.showerror("Резервная копия", str(error), parent=self.root)
             return None
-        messagebox.showinfo("Резервная копия", "Резервная копия создана:\n" + str(path), parent=self.root)
+        messagebox.showinfo(
+            "Резервная копия",
+            "Резервная копия создана:\n" + str(path),
+            parent=self.root,
+        )
         return path
 
     def logout(self):
@@ -179,6 +234,11 @@ class ApplicationController:
         if getattr(self, "lessons_view", None) is not None:
             if not self.lessons_view.leave_editing():
                 return False
+        try:
+            self.saved_login.forget(self.authenticator.current_user_id)
+        except (sqlite3.Error, OSError, ValueError) as error:
+            messagebox.showerror("Выход", str(error), parent=self.root)
+            return False
         self.close_lesson_form()
         if getattr(self, "settings_view", None) is not None:
             self.settings_view.clear_passwords()
@@ -187,7 +247,14 @@ class ApplicationController:
             self.main_window.destroy()
             self.main_window = None
         self.student_form = None
-        for name in ["students_view", "schedule_view", "lessons_view", "payments_view", "reports_view", "settings_view"]:
+        for name in [
+            "students_view",
+            "schedule_view",
+            "lessons_view",
+            "payments_view",
+            "reports_view",
+            "settings_view",
+        ]:
             setattr(self, name, None)
         self.view.show_login()
         self.view.pack(fill="both", expand=True)
@@ -215,7 +282,9 @@ class ApplicationController:
             if not students:
                 raise ValueError("Ученик не найден.")
             if len(students) > 1:
-                raise ValueError("Найдено несколько учеников. Выбери нужного из списка или введи ID.")
+                raise ValueError(
+                    "Найдено несколько учеников. Выбери нужного из списка или введи ID."
+                )
             try:
                 first = datetime.strptime(date_from, "%d.%m.%Y").date()
                 last = datetime.strptime(date_to, "%d.%m.%Y").date()
@@ -245,8 +314,13 @@ class ApplicationController:
             folder = Path(self.db.db_path).parent / "reports"
             folder.mkdir(exist_ok=True)
             path = filedialog.asksaveasfilename(
-                parent=self.root, title="Сохранить отчёт", initialdir=str(folder), initialfile=filename,
-                defaultextension=".txt", filetypes=[("Текстовый файл", "*.txt")], confirmoverwrite=True
+                parent=self.root,
+                title="Сохранить отчёт",
+                initialdir=str(folder),
+                initialfile=filename,
+                defaultextension=".txt",
+                filetypes=[("Текстовый файл", "*.txt")],
+                confirmoverwrite=True,
             )
             if not path:
                 return False
@@ -289,8 +363,12 @@ class ApplicationController:
             past = journal.get_items(str(student_id), False, student.is_archived)
             planned = False
             if not past:
-                planned = bool(journal.get_items(str(student_id), True, student.is_archived))
-            opened = self.lessons_view.open_student(student_id, student.is_archived, planned)
+                planned = bool(
+                    journal.get_items(str(student_id), True, student.is_archived)
+                )
+            opened = self.lessons_view.open_student(
+                student_id, student.is_archived, planned
+            )
         except (sqlite3.Error, ValueError) as error:
             messagebox.showerror("Занятия", str(error), parent=self.root)
             return
@@ -346,7 +424,10 @@ class ApplicationController:
             enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
             student = StudentRepository(self.db).get_by_id(enrollment.student_id)
             opened = self.lessons_view.show_lesson(
-                lesson_id, student.student_id, lesson.status == "Запланировано", student.is_archived
+                lesson_id,
+                student.student_id,
+                lesson.status == "Запланировано",
+                student.is_archived,
             )
         except (sqlite3.Error, ValueError) as error:
             messagebox.showerror("Занятия", str(error), parent=self.root)
@@ -373,14 +454,26 @@ class ApplicationController:
             subject = SubjectRepository(self.db).get_by_id(enrollment.subject_id)
             amount = lesson.price_kopecks
             money = str(amount // 100) + "," + str(amount % 100).zfill(2)
-            text = ("Зарегистрировать оплату?\n\nУченик: " + student.full_name
-                    + "\nID ученика: " + str(student.student_id).zfill(5)
-                    + "\nПредмет: " + subject[1] + " — " + enrollment.preparation_goal
-                    + "\nЗанятие №" + str(lesson_id) + "\n"
-                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
-                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
-                    + "\nСумма: " + money + " руб."
-                    + "\n\nДата оплаты будет записана текущим московским временем.")
+            text = (
+                "Зарегистрировать оплату?\n\nУченик: "
+                + student.full_name
+                + "\nID ученика: "
+                + str(student.student_id).zfill(5)
+                + "\nПредмет: "
+                + subject[1]
+                + " — "
+                + enrollment.preparation_goal
+                + "\nЗанятие №"
+                + str(lesson_id)
+                + "\n"
+                + lesson.starts_at.strftime("%d.%m.%Y %H:%M")
+                + "–"
+                + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
+                + "\nСумма: "
+                + money
+                + " руб."
+                + "\n\nДата оплаты будет записана текущим московским временем."
+            )
             if not messagebox.askyesno("Оплатить занятие", text, parent=self.root):
                 return
             PaymentService(self.db).register_payment(lesson_id, amount)
@@ -393,7 +486,9 @@ class ApplicationController:
             self.lessons_view.refresh()
         if getattr(self, "payments_view", None) is not None:
             self.payments_view.refresh()
-        messagebox.showinfo("Оплата занятия", "Оплата зарегистрирована.", parent=self.root)
+        messagebox.showinfo(
+            "Оплата занятия", "Оплата зарегистрирована.", parent=self.root
+        )
 
     def add_or_delete_lesson(self):
         """Действие первой кнопки расписания."""
@@ -404,7 +499,10 @@ class ApplicationController:
 
     def delete_lesson(self):
         """Удаление отменённого занятия без оплаты."""
-        if self.authenticator.current_user_id is None or not self.schedule_view.cancelled_mode:
+        if (
+            self.authenticator.current_user_id is None
+            or not self.schedule_view.cancelled_mode
+        ):
             return
         lesson_id = self.schedule_view.selected_lesson_id
         if lesson_id is None:
@@ -417,10 +515,15 @@ class ApplicationController:
                 raise ValueError("У занятия есть оплата. Его нельзя удалить.")
             enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
             student = StudentRepository(self.db).get_by_id(enrollment.student_id)
-            text = ("Удалить занятие из истории?\n\n" + student.full_name + "\n"
-                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
-                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
-                    + "\n\nВосстановить запись после удаления нельзя.")
+            text = (
+                "Удалить занятие из истории?\n\n"
+                + student.full_name
+                + "\n"
+                + lesson.starts_at.strftime("%d.%m.%Y %H:%M")
+                + "–"
+                + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
+                + "\n\nВосстановить запись после удаления нельзя."
+            )
             if not messagebox.askyesno("Удаление занятия", text, parent=self.root):
                 return
             LessonService(self.db).delete(lesson_id)
@@ -428,7 +531,9 @@ class ApplicationController:
             messagebox.showerror("Удаление занятия", str(error), parent=self.root)
             return
         self.schedule_view.refresh()
-        messagebox.showinfo("Удаление занятия", "Занятие удалено из истории.", parent=self.root)
+        messagebox.showinfo(
+            "Удаление занятия", "Занятие удалено из истории.", parent=self.root
+        )
 
     def open_lesson_form(self):
         """Открытие формы добавления занятия."""
@@ -440,14 +545,21 @@ class ApplicationController:
         try:
             students = StudentRepository(self.db).get_all()
             if not students:
-                raise ValueError("Сначала добавь активного ученика во вкладке «Ученики».")
+                raise ValueError(
+                    "Сначала добавь активного ученика во вкладке «Ученики»."
+                )
         except (sqlite3.Error, ValueError) as error:
             messagebox.showerror("Занятие", str(error), parent=self.root)
             return
         self.lesson_form = LessonForm(
-            self.root, self.main_window.family, students,
-            self.schedule_view.monday, int(self.schedule_view.half.get()),
-            self.load_lesson_directions, self.save_lesson, self.close_lesson_form
+            self.root,
+            self.main_window.family,
+            students,
+            self.schedule_view.monday,
+            int(self.schedule_view.half.get()),
+            self.load_lesson_directions,
+            self.save_lesson,
+            self.close_lesson_form,
         )
 
     def load_lesson_directions(self, student_id):
@@ -494,11 +606,15 @@ class ApplicationController:
             messagebox.showerror("Перенос занятия", str(error), parent=self.root)
             return
         self.lesson_form = LessonForm(
-            self.root, self.main_window.family, [student],
-            self.schedule_view.monday, int(self.schedule_view.half.get()),
+            self.root,
+            self.main_window.family,
+            [student],
+            self.schedule_view.monday,
+            int(self.schedule_view.half.get()),
             self.load_lesson_directions,
             lambda data: self.reschedule_lesson(lesson_id, data, cancelled),
-            self.close_lesson_form, record
+            self.close_lesson_form,
+            record,
         )
 
     def reschedule_lesson(self, lesson_id, data, cancelled=False):
@@ -512,7 +628,9 @@ class ApplicationController:
             if (lesson.status == "Отменено") != cancelled:
                 raise ValueError("Состояние занятия изменилось. Обнови расписание.")
             try:
-                starts_at = datetime.strptime(data["date"] + " " + data["time"], "%d.%m.%Y %H:%M")
+                starts_at = datetime.strptime(
+                    data["date"] + " " + data["time"], "%d.%m.%Y %H:%M"
+                )
             except ValueError:
                 raise ValueError("Укажи дату в формате ДД.ММ.ГГГГ и время ЧЧ:ММ.")
             ends_at = starts_at + (lesson.ends_at - lesson.starts_at)
@@ -533,6 +651,7 @@ class ApplicationController:
             self.schedule_view.set_cancelled_mode(not self.schedule_view.cancelled_mode)
 
     def change_lesson_status(self):
+        """Отмена выбранного занятия."""
         if self.schedule_view.cancelled_mode:
             self.restore_lesson()
         else:
@@ -552,7 +671,9 @@ class ApplicationController:
             return
         self.schedule_view.set_cancelled_mode(False)
         self.schedule_view.show_lesson(lesson)
-        messagebox.showinfo("Восстановление занятия", "Занятие восстановлено.", parent=self.root)
+        messagebox.showinfo(
+            "Восстановление занятия", "Занятие восстановлено.", parent=self.root
+        )
 
     def cancel_lesson(self):
         """Отмена выбранного занятия."""
@@ -567,9 +688,14 @@ class ApplicationController:
                 raise ValueError("Выбери занятие в расписании.")
             enrollment = EnrollmentRepository(self.db).get_by_id(lesson.enrollment_id)
             student = StudentRepository(self.db).get_by_id(enrollment.student_id)
-            text = ("Отменить занятие?\n\n" + student.full_name + "\n"
-                    + lesson.starts_at.strftime("%d.%m.%Y %H:%M") + "–"
-                    + lesson.ends_at.strftime("%d.%m.%Y %H:%M"))
+            text = (
+                "Отменить занятие?\n\n"
+                + student.full_name
+                + "\n"
+                + lesson.starts_at.strftime("%d.%m.%Y %H:%M")
+                + "–"
+                + lesson.ends_at.strftime("%d.%m.%Y %H:%M")
+            )
             if not messagebox.askyesno("Отмена занятия", text, parent=self.root):
                 return
             LessonService(self.db).cancel(lesson_id)
@@ -597,11 +723,15 @@ class ApplicationController:
             if enrollment is None or enrollment.student_id != student.student_id:
                 raise ValueError("Это направление не принадлежит выбранному ученику.")
             try:
-                starts_at = datetime.strptime(data["date"] + " " + data["time"], "%d.%m.%Y %H:%M")
+                starts_at = datetime.strptime(
+                    data["date"] + " " + data["time"], "%d.%m.%Y %H:%M"
+                )
             except ValueError:
                 raise ValueError("Укажи дату в формате ДД.ММ.ГГГГ и время ЧЧ:ММ.")
             duration = duration_minutes(data["hours"], data["minutes"])
-            lesson = LessonService(self.db).schedule(enrollment.enrollment_id, starts_at, duration)
+            lesson = LessonService(self.db).schedule(
+                enrollment.enrollment_id, starts_at, duration
+            )
         except (sqlite3.Error, ValueError, OverflowError) as error:
             messagebox.showerror("Занятие", str(error), parent=self.root)
             return
@@ -610,8 +740,9 @@ class ApplicationController:
         amount = lesson.price_kopecks
         money = str(amount // 100) + "," + str(amount % 100).zfill(2)
         messagebox.showinfo(
-            "Занятие", "Занятие добавлено. Стоимость: " + money + " руб.",
-            parent=self.root
+            "Занятие",
+            "Занятие добавлено. Стоимость: " + money + " руб.",
+            parent=self.root,
         )
 
     def load_schedule(self, date_from, date_to, cancelled=False):
@@ -637,14 +768,16 @@ class ApplicationController:
                 enrollment = enrollments.get_by_id(lesson.enrollment_id)
                 student = students.get_by_id(enrollment.student_id)
                 subject = subjects.get_by_id(enrollment.subject_id)
-                items.append({
-                    "lesson": lesson,
-                    "student_name": student.full_name,
-                    "student_id": student.student_id,
-                    "subject": subject[1],
-                    "goal": enrollment.preparation_goal,
-                    "paid": payments.get_by_lesson(lesson.lesson_id) is not None
-                })
+                items.append(
+                    {
+                        "lesson": lesson,
+                        "student_name": student.full_name,
+                        "student_id": student.student_id,
+                        "subject": subject[1],
+                        "goal": enrollment.preparation_goal,
+                        "paid": payments.get_by_lesson(lesson.lesson_id) is not None,
+                    }
+                )
             return items
         except (sqlite3.Error, ValueError) as error:
             messagebox.showerror("Расписание", str(error), parent=self.root)
@@ -662,8 +795,12 @@ class ApplicationController:
         if record is not None:
             lookup = self.find_student_for_edit
         form = StudentForm(
-            self.main_window.pages["Ученики"], self.main_window.family,
-            self.save_student, self.close_student_form, record, lookup
+            self.main_window.pages["Ученики"],
+            self.main_window.family,
+            self.save_student,
+            self.close_student_form,
+            record,
+            lookup,
         )
         if self.student_form is not None:
             self.student_form.destroy()
@@ -705,7 +842,7 @@ class ApplicationController:
             if not messagebox.askyesno(
                 "Изменить карточку",
                 "Загрузить другую карточку? Несохранённые изменения будут потеряны.",
-                parent=self.root
+                parent=self.root,
             ):
                 return
         self.show_student_form(record)
@@ -737,10 +874,7 @@ class ApplicationController:
         self.close_student_form()
         self.students_view.set_archive_mode(data["student"]["is_archived"])
         self.students_view.select_student(student_id)
-        messagebox.showinfo(
-            "Ученики", text + str(student_id),
-            parent=self.root
-        )
+        messagebox.showinfo("Ученики", text + str(student_id), parent=self.root)
 
     def move_student(self):
         """Перемещение выбранного ученика или восстановление."""
@@ -779,11 +913,13 @@ class ApplicationController:
                     subject = subjects.get_by_id(enrollment.subject_id)
                     directions.append((enrollment, subject[1]))
 
-                items.append({
-                    "student": student,
-                    "parents": parents.get_by_student(student.student_id),
-                    "enrollments": directions
-                })
+                items.append(
+                    {
+                        "student": student,
+                        "parents": parents.get_by_student(student.student_id),
+                        "enrollments": directions,
+                    }
+                )
 
             return items
 
@@ -801,11 +937,10 @@ class ApplicationController:
             self.authenticator.register(name, username, email, password)
 
         except (sqlite3.Error, ValueError) as error:
-            messagebox.showerror(
-                "Регистрация", str(error), parent=self.root
-            )
+            messagebox.showerror("Регистрация", str(error), parent=self.root)
 
         else:
+            self.backup_due = True
             messagebox.showinfo(
                 "Регистрация", "Учётная запись создана.", parent=self.root
             )
@@ -816,6 +951,27 @@ class ApplicationController:
         if getattr(self, "lessons_view", None) is not None:
             if not self.lessons_view.leave_editing():
                 return
+
+        # Копия после работы
+        while self.backup_due:
+            try:
+                self.db.backup()
+            except (sqlite3.Error, OSError, ValueError) as error:
+                retry = messagebox.askretrycancel(
+                    "Резервная копия",
+                    "Не удалось создать копию базы.\n"
+                    + str(error)
+                    + (
+                        "\n\nПовторить? Нажми «Отмена», чтобы оставить программу "
+                        "открытой."
+                    ),
+                    parent=self.root,
+                )
+                if not retry:
+                    return
+            else:
+                self.backup_due = False
+
         self.authenticator.logout()
         self.db.close()
         self.root.destroy()

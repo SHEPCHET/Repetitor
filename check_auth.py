@@ -6,7 +6,6 @@ from getpass import getpass
 from authenticator import Authenticator
 from database import DatabaseManager
 
-
 db = DatabaseManager()
 
 try:
@@ -36,9 +35,7 @@ try:
                 if password != repeat:
                     raise ValueError("Пароли не совпадают.")
 
-                authenticator.register(
-                    name, username, email, password
-                )
+                authenticator.register(name, username, email, password)
                 print("Учётная запись создана. Теперь можно войти.")
 
             elif action == "2":
@@ -63,9 +60,7 @@ try:
 
             elif action == "4":
                 if authenticator.current_user_id is None:
-                    raise ValueError(
-                        "Сначала войди в учётную запись."
-                    )
+                    raise ValueError("Сначала войди в учётную запись.")
 
                 current_password = getpass("Текущий пароль: ")
                 new_password = getpass("Новый пароль: ")
@@ -74,9 +69,7 @@ try:
                 if new_password != repeat:
                     raise ValueError("Новые пароли не совпадают.")
 
-                changed = authenticator.change_password(
-                    current_password, new_password
-                )
+                changed = authenticator.change_password(current_password, new_password)
 
                 if changed:
                     print("Пароль изменён.")

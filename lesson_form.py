@@ -20,8 +20,19 @@ def duration_minutes(hours, minutes):
 class LessonForm(tk.Frame):
     """Выбор ученика, направления и времени."""
 
-    def __init__(self, parent, family, students, monday, half,
-                 load_directions, on_save, on_cancel, record=None):
+    def __init__(
+        self,
+        parent,
+        family,
+        students,
+        monday,
+        half,
+        load_directions,
+        on_save,
+        on_cancel,
+        record=None,
+    ):
+        """Подготовка данных и элементов объекта."""
         super().__init__(parent, bg="#6b6b6b")
         self.family = family
         self.students = students
@@ -33,18 +44,25 @@ class LessonForm(tk.Frame):
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure(
-            "Lesson.TCombobox", padding=(5, 0), borderwidth=0,
-            fieldbackground="#d9d9d9", background="#d9d9d9",
-            bordercolor="#d9d9d9", lightcolor="#d9d9d9", darkcolor="#d9d9d9"
+            "Lesson.TCombobox",
+            padding=(5, 0),
+            borderwidth=0,
+            fieldbackground="#d9d9d9",
+            background="#d9d9d9",
+            bordercolor="#d9d9d9",
+            lightcolor="#d9d9d9",
+            darkcolor="#d9d9d9",
         )
         style.map(
-            "Lesson.TCombobox", fieldbackground=[("readonly", "#d9d9d9")],
+            "Lesson.TCombobox",
+            fieldbackground=[("readonly", "#d9d9d9")],
             background=[("active", "#d9d9d9"), ("readonly", "#d9d9d9")],
             foreground=[("disabled", "black"), ("readonly", "black")],
             selectbackground=[("readonly", "#d9d9d9")],
             selectforeground=[("readonly", "black")],
             bordercolor=[("focus", "#d9d9d9")],
-            lightcolor=[("focus", "#d9d9d9")], darkcolor=[("focus", "#d9d9d9")]
+            lightcolor=[("focus", "#d9d9d9")],
+            darkcolor=[("focus", "#d9d9d9")],
         )
         style.map("Hint.Lesson.TCombobox", foreground=[("readonly", "#6b6b6b")])
 
@@ -54,21 +72,43 @@ class LessonForm(tk.Frame):
             if record["lesson"].status == "Отменено":
                 title = "Перенос отменённого занятия"
         tk.Label(
-            self, text=title, font=(family, -24),
-            bg="#6b6b6b", fg="white", padx=0, pady=0
+            self,
+            text=title,
+            font=(family, -24),
+            bg="#6b6b6b",
+            fg="white",
+            padx=0,
+            pady=0,
         ).place(x=0, y=5, width=621, height=32)
 
-        labels = ["Ученик:", "Предмет:", "Дата:", "Время:",
-                  "Длительность:", "Стоимость занятия:"]
+        labels = [
+            "Ученик:",
+            "Предмет:",
+            "Дата:",
+            "Время:",
+            "Длительность:",
+            "Стоимость занятия:",
+        ]
         for row, text in enumerate(labels):
             tk.Label(
-                self, text=text, font=(family, -16), bg="#6b6b6b",
-                fg="white", anchor="e", padx=0, pady=0
+                self,
+                text=text,
+                font=(family, -16),
+                bg="#6b6b6b",
+                fg="white",
+                anchor="e",
+                padx=0,
+                pady=0,
             ).place(x=105, y=80 + row * 35, width=162, height=25)
 
         self.student_combo = self._combo(
-            [str(student.student_id).zfill(5) + " — " + student.full_name
-             for student in students], 277, 80, 260
+            [
+                str(student.student_id).zfill(5) + " — " + student.full_name
+                for student in students
+            ],
+            277,
+            80,
+            260,
         )
         self.student_combo.configure(style="Hint.Lesson.TCombobox")
         self.student_combo.set("Выберите ученика")
@@ -78,8 +118,9 @@ class LessonForm(tk.Frame):
         self.direction_combo.set("Выберите предмет и цель")
         self.direction_combo.bind("<<ComboboxSelected>>", self._preview)
 
-        dates = [(monday + timedelta(days=day)).strftime("%d.%m.%Y")
-                 for day in range(7)]
+        dates = [
+            (monday + timedelta(days=day)).strftime("%d.%m.%Y") for day in range(7)
+        ]
         self.date_combo = self._combo(dates, 277, 150, 206, editable=True)
         today = datetime.now(timezone(timedelta(hours=3))).date()
         selected_date = monday
@@ -96,17 +137,23 @@ class LessonForm(tk.Frame):
         self.minutes = tk.StringVar(master=self, value="00")
         self.hours_combo = self._combo(list(range(13)), 277, 220, 81, editable=True)
         self.hours_combo.configure(textvariable=self.hours)
-        tk.Label(
-            self, text=":", font=(family, -20), bg="#6b6b6b", fg="white"
-        ).place(x=358, y=220, width=13, height=25)
+        tk.Label(self, text=":", font=(family, -20), bg="#6b6b6b", fg="white").place(
+            x=358, y=220, width=13, height=25
+        )
         self.minutes_combo = self._combo(["00", "30"], 371, 220, 81)
         self.minutes_combo.configure(textvariable=self.minutes)
         self.hours.trace_add("write", self._preview)
         self.minutes.trace_add("write", self._preview)
         self.price = tk.StringVar(master=self, value="—")
         tk.Label(
-            self, textvariable=self.price, font=(family, -12),
-            bg="#d9d9d9", fg="black", anchor="center", padx=0, pady=0
+            self,
+            textvariable=self.price,
+            font=(family, -12),
+            bg="#d9d9d9",
+            fg="black",
+            anchor="center",
+            padx=0,
+            pady=0,
         ).place(x=277, y=255, width=125, height=25)
 
         self._button("Отмена", on_cancel).place(x=17, y=326, width=106, height=24)
@@ -117,10 +164,14 @@ class LessonForm(tk.Frame):
             lesson = record["lesson"]
             self.student_combo.current(0)
             self.student_combo.configure(state="disabled", style="Lesson.TCombobox")
-            self.directions = [{"enrollment": record["enrollment"], "subject": record["subject"]}]
+            self.directions = [
+                {"enrollment": record["enrollment"], "subject": record["subject"]}
+            ]
             self.direction_combo.configure(
-                values=[record["subject"] + " — " + record["enrollment"].preparation_goal],
-                style="Lesson.TCombobox"
+                values=[
+                    record["subject"] + " — " + record["enrollment"].preparation_goal
+                ],
+                style="Lesson.TCombobox",
             )
             self.direction_combo.current(0)
             self.direction_combo.configure(state="disabled")
@@ -142,22 +193,35 @@ class LessonForm(tk.Frame):
             self.date_combo.focus_set()
 
     def _combo(self, values, x, y, width, editable=False):
+        """Создание списка для выбора значения."""
         state = "normal" if editable else "readonly"
         combo = ttk.Combobox(
-            self, values=values, state=state, font=(self.family, -12),
-            style="Lesson.TCombobox", height=12
+            self,
+            values=values,
+            state=state,
+            font=(self.family, -12),
+            style="Lesson.TCombobox",
+            height=12,
         )
         combo.place(x=x, y=y, width=width, height=25)
         return combo
 
     def _button(self, text, command):
+        """Создание кнопки с обработчиком нажатия."""
         return tk.Button(
-            self, text=text, command=command, font=(self.family, -14),
-            bg="#d9d9d9", fg="black", relief="flat", borderwidth=0,
-            cursor="hand2"
+            self,
+            text=text,
+            command=command,
+            font=(self.family, -14),
+            bg="#d9d9d9",
+            fg="black",
+            relief="flat",
+            borderwidth=0,
+            cursor="hand2",
         )
 
     def _student_changed(self, event=None):
+        """Обновление направлений после выбора ученика."""
         self.directions = []
         self.direction_combo.configure(values=[], style="Hint.Lesson.TCombobox")
         self.direction_combo.set("Выберите предмет и цель")
@@ -170,14 +234,20 @@ class LessonForm(tk.Frame):
         choices = []
         for number, item in enumerate(self.directions, 1):
             enrollment = item["enrollment"]
-            choices.append(str(number) + ". " + item["subject"] + " — "
-                           + enrollment.preparation_goal)
+            choices.append(
+                str(number)
+                + ". "
+                + item["subject"]
+                + " — "
+                + enrollment.preparation_goal
+            )
         self.direction_combo.configure(values=choices)
         if not choices:
             self.direction_combo.set("Нет направлений обучения")
         self._preview()
 
     def _preview(self, *args):
+        """Пересчёт стоимости по выбранной длительности."""
         index = self.direction_combo.current()
         self.price.set("—")
         self.save_button.configure(state="disabled")
@@ -195,19 +265,28 @@ class LessonForm(tk.Frame):
         self.save_button.configure(state="normal")
 
     def _save(self):
+        """Передача заполненных данных обработчику сохранения."""
         student_index = self.student_combo.current()
         direction_index = self.direction_combo.current()
         if student_index < 0 or direction_index < 0:
-            messagebox.showerror("Занятие", "Выберите ученика и направление.", parent=self)
+            messagebox.showerror(
+                "Занятие", "Выберите ученика и направление.", parent=self
+            )
             return
-        self.on_save({
-            "student_id": self.students[student_index].student_id,
-            "enrollment_id": self.directions[direction_index]["enrollment"].enrollment_id,
-            "date": self.date_combo.get().strip(),
-            "time": self.time_combo.get().strip(),
-            "hours": self.hours.get(), "minutes": self.minutes.get()
-        })
+        self.on_save(
+            {
+                "student_id": self.students[student_index].student_id,
+                "enrollment_id": self.directions[direction_index][
+                    "enrollment"
+                ].enrollment_id,
+                "date": self.date_combo.get().strip(),
+                "time": self.time_combo.get().strip(),
+                "hours": self.hours.get(),
+                "minutes": self.minutes.get(),
+            }
+        )
 
     def destroy(self):
+        """Удаление окна и отключение его обработчиков."""
         self.grab_release()
         super().destroy()

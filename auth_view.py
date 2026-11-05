@@ -22,7 +22,7 @@ class InputField(tk.Frame):
             relief="flat",
             cursor="xterm",
             borderwidth=0,
-            highlightthickness=0
+            highlightthickness=0,
         )
 
         if password:
@@ -40,7 +40,7 @@ class InputField(tk.Frame):
             cursor="xterm",
             borderwidth=0,
             padx=0,
-            pady=0
+            pady=0,
         )
 
         self.bind("<Button-1>", self._focus)
@@ -93,12 +93,11 @@ class AuthWindow(tk.Frame):
             self.family = "Arial"
 
         self.panel = tk.Frame(self, bg="white")
-        self.panel.place(
-            relx=0.5, rely=0.5, anchor="center",
-            width=600, height=800
-        )
+        self.panel.place(relx=0.5, rely=0.5, anchor="center", width=600, height=800)
 
         self.fields = {}
+
+        self.show_password = tk.BooleanVar(master=self.panel, value=False)
         self.show_login()
 
     def _clear(self):
@@ -111,24 +110,33 @@ class AuthWindow(tk.Frame):
     def _title(self, text, y):
         """Заголовок формы."""
         title = tk.Label(
-            self.panel, text=text, font=(self.family, -32),
-            bg="white", fg="black",
-            borderwidth=0, padx=0, pady=0
+            self.panel,
+            text=text,
+            font=(self.family, -32),
+            bg="white",
+            fg="black",
+            borderwidth=0,
+            padx=0,
+            pady=0,
         )
         title.place(x=0, y=y, width=600, height=39)
 
     def _field(self, key, label, hint, y, password=False):
         """Подпись и поле ввода."""
         caption = tk.Label(
-            self.panel, text=label, font=(self.family, -18),
-            bg="white", fg="black", anchor="w",
-            borderwidth=0, padx=0, pady=0
+            self.panel,
+            text=label,
+            font=(self.family, -18),
+            bg="white",
+            fg="black",
+            anchor="w",
+            borderwidth=0,
+            padx=0,
+            pady=0,
         )
         caption.place(x=120, y=y, width=360, height=22)
 
-        field = InputField(
-            self.panel, hint, self.family, password
-        )
+        field = InputField(self.panel, hint, self.family, password)
         field.place(x=120, y=y + 22, width=360, height=48)
         field.entry.bind("<Return>", self._submit)
 
@@ -137,14 +145,20 @@ class AuthWindow(tk.Frame):
     def _button(self, text, y):
         """Основная кнопка формы."""
         button = tk.Button(
-            self.panel, text=text, command=self._submit,
+            self.panel,
+            text=text,
+            command=self._submit,
             font=(self.family, -18),
-            bg="#757575", fg="white",
+            bg="#757575",
+            fg="white",
             activebackground="#757575",
             activeforeground="white",
-            relief="flat", borderwidth=0,
+            relief="flat",
+            borderwidth=0,
             highlightthickness=0,
-            cursor="hand2", padx=0, pady=0
+            cursor="hand2",
+            padx=0,
+            pady=0,
         )
         button.place(x=120, y=y, width=360, height=48)
         button.bind("<Return>", self._submit)
@@ -158,20 +172,31 @@ class AuthWindow(tk.Frame):
         row.pack()
 
         tk.Label(
-            row, text=text, font=(self.family, -16),
-            bg="white", fg="#6f6f6f",
-            padx=0, pady=0, borderwidth=0
+            row,
+            text=text,
+            font=(self.family, -16),
+            bg="white",
+            fg="#6f6f6f",
+            padx=0,
+            pady=0,
+            borderwidth=0,
         ).pack(side="left")
 
         button = tk.Button(
-            row, text=link, command=command,
+            row,
+            text=link,
+            command=command,
             font=(self.family, -16, "underline"),
-            bg="white", fg="black",
+            bg="white",
+            fg="black",
             activebackground="white",
             activeforeground="black",
-            relief="flat", borderwidth=0,
+            relief="flat",
+            borderwidth=0,
             highlightthickness=0,
-            cursor="hand2", padx=0, pady=0
+            cursor="hand2",
+            padx=0,
+            pady=0,
         )
         button.pack(side="left")
         button.bind("<Return>", self._follow_link)
@@ -181,22 +206,49 @@ class AuthWindow(tk.Frame):
         event.widget.invoke()
         return "break"
 
+    def _password_switch(self, y):
+        """Показать или скрыть пароль."""
+        self.show_password = tk.BooleanVar(master=self.panel, value=False)
+        tk.Checkbutton(
+            self.panel,
+            text="Показать пароль",
+            variable=self.show_password,
+            command=self._toggle_passwords,
+            font=(self.family, -14),
+            bg="white",
+            fg="black",
+            activebackground="white",
+            activeforeground="black",
+            selectcolor="white",
+            anchor="w",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=0,
+            pady=0,
+            cursor="hand2",
+        ).place(x=120, y=y, width=360, height=22)
+
+    def _toggle_passwords(self):
+        """Переключение видимости введённых паролей."""
+        mask = "*"
+        if self.show_password.get():
+            mask = ""
+        for key in ("password", "repeat"):
+            if key in self.fields:
+                self.fields[key].entry.configure(show=mask)
+
     def show_login(self, username=""):
         """Экран входа."""
         self._clear()
         self.mode = "login"
 
         self._title("Вход в систему", 268)
-        self._field(
-            "username", "Логин", "Введите логин", 337
-        )
-        self._field(
-            "password", "Пароль", "Введите пароль", 430, True
-        )
+        self._field("username", "Логин", "Введите логин", 337)
+        self._field("password", "Пароль", "Введите пароль", 430, True)
+        self._password_switch(507)
         self._button("Войти", 537)
         self._footer(
-            "Нет аккаунта? ", "Зарегистрироваться", 609,
-            self.show_registration
+            "Нет аккаунта? ", "Зарегистрироваться", 609, self.show_registration
         )
 
         self.fields["username"].set(username)
@@ -208,29 +260,32 @@ class AuthWindow(tk.Frame):
 
         self._title("Регистрация в системе", 76)
         self._field("name", "Имя", "Введите имя", 145)
+        self._field("username", "Логин", "Придумайте логин", 238)
         self._field(
-            "username", "Логин", "Придумайте логин", 238
+            "email", "Электронная почта", "Введите адрес электронной почты", 331
         )
-        self._field(
-            "email", "Электронная почта",
-            "Введите адрес электронной почты", 331
-        )
-        self._field(
-            "password", "Пароль", "Придумайте пароль", 424, True
-        )
-        self._field(
-            "repeat", "Подтверждение пароля",
-            "Повторите пароль", 517, True
-        )
+        self._field("password", "Пароль", "Придумайте пароль", 424, True)
+        tk.Label(
+            self.panel,
+            text="От 8 символов, хотя бы одна буква и цифра.",
+            font=(self.family, -12),
+            bg="white",
+            fg="#555555",
+            anchor="w",
+            borderwidth=0,
+            padx=0,
+            pady=0,
+        ).place(x=120, y=496, width=360, height=18)
+        self._field("repeat", "Подтверждение пароля", "Повторите пароль", 517, True)
+        self._password_switch(594)
         self._button("Зарегистрироваться", 624)
-        self._footer(
-            "Уже есть аккаунт? ", "Войти", 696,
-            self.show_login
-        )
+        self._footer("Уже есть аккаунт? ", "Войти", 696, self.show_login)
 
     def clear_password(self):
         """Очистка пароля после проверки входа."""
         self.fields["password"].set("")
+        self.show_password.set(False)
+        self._toggle_passwords()
 
     def _submit(self, event=None):
         """Передача введённых данных контроллеру."""
@@ -240,16 +295,14 @@ class AuthWindow(tk.Frame):
             values[key] = field.get()
 
         if self.mode == "login":
-            self.on_login(
-                values["username"], values["password"]
-            )
+            self.on_login(values["username"], values["password"])
         else:
             self.on_register(
                 values["name"],
                 values["username"],
                 values["email"],
                 values["password"],
-                values["repeat"]
+                values["repeat"],
             )
 
         return "break"

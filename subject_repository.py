@@ -14,9 +14,7 @@ class SubjectRepository:
         name = name.strip()
 
         if name == "":
-            raise ValueError(
-                "Название предмета не должно быть пустым."
-            )
+            raise ValueError("Название предмета не должно быть пустым.")
 
         return name
 
@@ -24,18 +22,24 @@ class SubjectRepository:
         """Добавление предмета и получение ID."""
         name = self._check_name(name)
 
-        cursor = self.db.connection.execute("""
+        cursor = self.db.connection.execute(
+            """
             INSERT INTO subjects (name) VALUES (?);
-        """, [name])
+        """,
+            [name],
+        )
 
         return cursor.lastrowid
 
     def get_by_id(self, subject_id):
         """Предмет по ID или None."""
-        return self.db.connection.execute("""
+        return self.db.connection.execute(
+            """
             SELECT subject_id, name FROM subjects
             WHERE subject_id = ?;
-        """, [subject_id]).fetchone()
+        """,
+            [subject_id],
+        ).fetchone()
 
     def get_all(self):
         """Все предметы: ID и название."""
@@ -48,29 +52,36 @@ class SubjectRepository:
         """Изменение названия предмета."""
         name = self._check_name(name)
 
-        cursor = self.db.connection.execute("""
+        cursor = self.db.connection.execute(
+            """
             UPDATE subjects SET name = ?
             WHERE subject_id = ?;
-        """, [name, subject_id])
+        """,
+            [name, subject_id],
+        )
 
         if cursor.rowcount == 0:
             raise ValueError("Предмет с таким ID не найден.")
 
     def delete(self, subject_id):
         """Удаление предмета без направлений обучения."""
-        enrollment = self.db.connection.execute("""
+        enrollment = self.db.connection.execute(
+            """
             SELECT enrollment_id FROM enrollments
             WHERE subject_id = ? LIMIT 1;
-        """, [subject_id]).fetchone()
+        """,
+            [subject_id],
+        ).fetchone()
 
         if enrollment is not None:
-            raise ValueError(
-                "Предмет используется в направлениях обучения."
-            )
+            raise ValueError("Предмет используется в направлениях обучения.")
 
-        cursor = self.db.connection.execute("""
+        cursor = self.db.connection.execute(
+            """
             DELETE FROM subjects WHERE subject_id = ?;
-        """, [subject_id])
+        """,
+            [subject_id],
+        )
 
         if cursor.rowcount == 0:
             raise ValueError("Предмет с таким ID не найден.")

@@ -1,0 +1,120 @@
+{
+  "created_msk": "2026-11-05T21:23:52.686929+03:00",
+  "python": "3.15.0",
+  "sqlite": "3.53.4",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "scope": "data_and_controller_without_native_window_rendering",
+  "initial_counts": {
+    "students": 100,
+    "lessons": 10000,
+    "lesson_topics": 20000,
+    "payments": 3333
+  },
+  "results": [
+    {
+      "operation": "Поиск и загрузка 100 карточек",
+      "repeats": 5,
+      "median_seconds": 0.013851,
+      "max_seconds": 0.015468,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Поиск ученика по ID",
+      "repeats": 5,
+      "median_seconds": 0.000408,
+      "max_seconds": 0.001116,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Загрузка недели расписания",
+      "repeats": 5,
+      "median_seconds": 0.012546,
+      "max_seconds": 0.018472,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Загрузка журнала проведённых занятий",
+      "repeats": 5,
+      "median_seconds": 0.440755,
+      "max_seconds": 0.444851,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Поиск в журнале по ID",
+      "repeats": 5,
+      "median_seconds": 0.421962,
+      "max_seconds": 0.451674,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Загрузка истории оплат",
+      "repeats": 5,
+      "median_seconds": 0.837842,
+      "max_seconds": 0.888064,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Расчёт балансов 100 учеников",
+      "repeats": 5,
+      "median_seconds": 0.233755,
+      "max_seconds": 0.259381,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Отчёт за месяц через обработчик",
+      "repeats": 5,
+      "median_seconds": 0.204485,
+      "max_seconds": 0.281105,
+      "limit_seconds": 5,
+      "within_limit": true
+    },
+    {
+      "operation": "Добавление ученика",
+      "repeats": 5,
+      "median_seconds": 0.005594,
+      "max_seconds": 0.007699,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Изменение карточки ученика",
+      "repeats": 5,
+      "median_seconds": 0.00668,
+      "max_seconds": 0.008732,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Добавление занятия",
+      "repeats": 5,
+      "median_seconds": 0.007022,
+      "max_seconds": 0.008962,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Перенос занятия",
+      "repeats": 5,
+      "median_seconds": 0.008338,
+      "max_seconds": 0.00956,
+      "limit_seconds": 2,
+      "within_limit": true
+    },
+    {
+      "operation": "Сохранение TXT",
+      "repeats": 5,
+      "median_seconds": 0.000567,
+      "max_seconds": 0.000678,
+      "limit_seconds": 5,
+      "within_limit": true
+    }
+  ],
+  "all_within_limits": true
+}

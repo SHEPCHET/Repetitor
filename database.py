@@ -17,9 +17,7 @@ class DatabaseManager:
     def connect(self):
         """Открытие базы."""
         if not self.db_path.exists():
-            raise FileNotFoundError(
-                "База не найдена. Сначала запусти init_db.py."
-            )
+            raise FileNotFoundError("База не найдена. Сначала запусти init_db.py.")
 
         if self.connection is None:
             self.connection = sqlite3.connect(self.db_path)
@@ -36,19 +34,14 @@ class DatabaseManager:
         self.connect()
 
         if self.connection.in_transaction:
-            raise ValueError(
-                "Сначала сохрани или отмени предыдущие изменения."
-            )
+            raise ValueError("Сначала сохрани или отмени предыдущие изменения.")
 
         if path is None:
             moscow = timezone(timedelta(hours=3))
-            stamp = datetime.now(moscow).strftime(
-                "%Y%m%d_%H%M%S_%f"
-            )
+            stamp = datetime.now(moscow).strftime("%Y%m%d_%H%M%S_%f")
 
             backup_path = (
-                self.db_path.parent / "backups"
-                / ("repetitor_" + stamp + ".db")
+                self.db_path.parent / "backups" / ("repetitor_" + stamp + ".db")
             )
 
         else:
@@ -63,9 +56,7 @@ class DatabaseManager:
             raise ValueError("Для копии нужен отдельный файл.")
 
         if backup_path.exists():
-            raise FileExistsError(
-                "Файл с таким именем уже существует."
-            )
+            raise FileExistsError("Файл с таким именем уже существует.")
 
         backup_path.parent.mkdir(parents=True, exist_ok=True)
 

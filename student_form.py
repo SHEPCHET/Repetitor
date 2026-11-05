@@ -8,25 +8,40 @@ class FormInput(tk.Frame):
     """Поле с подсказкой."""
 
     def __init__(self, parent, family, hint, choices=None):
+        """Подготовка данных и элементов объекта."""
         super().__init__(parent, bg="#d9d9d9", height=32, cursor="xterm")
         self.value = tk.StringVar(master=self)
         if choices is None:
             self.entry = tk.Entry(
-                self, textvariable=self.value, font=(family, -14),
-                bg="#d9d9d9", relief="flat", borderwidth=0,
-                highlightthickness=0
+                self,
+                textvariable=self.value,
+                font=(family, -14),
+                bg="#d9d9d9",
+                relief="flat",
+                borderwidth=0,
+                highlightthickness=0,
             )
             self.entry.place(x=8, y=0, relwidth=1, width=-16, relheight=1)
         else:
             self.entry = ttk.Combobox(
-                self, textvariable=self.value, values=choices,
-                font=(family, -14), state="readonly", style="Card.TCombobox"
+                self,
+                textvariable=self.value,
+                values=choices,
+                font=(family, -14),
+                state="readonly",
+                style="Card.TCombobox",
             )
             self.entry.place(x=0, y=0, relwidth=1, relheight=1)
 
         self.hint = tk.Label(
-            self, text=hint, bg="#d9d9d9", fg="#6b6b6b",
-            font=(family, -14), anchor="w", cursor="xterm", padx=0
+            self,
+            text=hint,
+            bg="#d9d9d9",
+            fg="#6b6b6b",
+            font=(family, -14),
+            anchor="w",
+            cursor="xterm",
+            padx=0,
         )
         self.hint.bind("<Button-1>", self._focus)
         self.bind("<Button-1>", self._focus)
@@ -36,6 +51,7 @@ class FormInput(tk.Frame):
         self._refresh()
 
     def _focus(self, event=None):
+        """Передача фокуса полю при нажатии на серый блок."""
         self.entry.focus_set()
         if isinstance(self.entry, ttk.Combobox):
             self.entry.event_generate(
@@ -43,12 +59,14 @@ class FormInput(tk.Frame):
             )
 
     def _refresh(self, *args):
+        """Обновление подсказки пустого поля."""
         if self.value.get() == "" and self.focus_get() != self.entry:
             self.hint.place(x=8, y=0, relwidth=1, width=-32, height=32)
         else:
             self.hint.place_forget()
 
     def get(self):
+        """Получение текущего значения поля."""
         return self.value.get().strip()
 
     def set(self, value):
@@ -66,6 +84,7 @@ class StudentForm(tk.Frame):
     """Данные ученика, родителей и предметов."""
 
     def __init__(self, parent, family, on_save, on_cancel, record=None, on_lookup=None):
+        """Подготовка данных и элементов объекта."""
         super().__init__(parent, bg="#d9d9d9")
         self.family = family
         self.on_save = on_save
@@ -80,10 +99,16 @@ class StudentForm(tk.Frame):
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure(
-            "Card.TCombobox", padding=(8, 0), borderwidth=0,
-            relief="flat", background="#d9d9d9", fieldbackground="#d9d9d9",
-            bordercolor="#d9d9d9", lightcolor="#d9d9d9",
-            darkcolor="#d9d9d9", arrowcolor="black"
+            "Card.TCombobox",
+            padding=(8, 0),
+            borderwidth=0,
+            relief="flat",
+            background="#d9d9d9",
+            fieldbackground="#d9d9d9",
+            bordercolor="#d9d9d9",
+            lightcolor="#d9d9d9",
+            darkcolor="#d9d9d9",
+            arrowcolor="black",
         )
         style.map(
             "Card.TCombobox",
@@ -94,7 +119,7 @@ class StudentForm(tk.Frame):
             selectforeground=[("readonly", "black")],
             bordercolor=[("focus", "#d9d9d9")],
             lightcolor=[("focus", "#d9d9d9")],
-            darkcolor=[("focus", "#d9d9d9")]
+            darkcolor=[("focus", "#d9d9d9")],
         )
         self.option_add("*TCombobox*Listbox.background", "#d9d9d9")
         self.option_add("*TCombobox*Listbox.foreground", "black")
@@ -115,7 +140,9 @@ class StudentForm(tk.Frame):
             self.lookup.place(x=20, y=73, width=212, height=32)
             self.lookup.entry.bind("<Return>", self._lookup)
         else:
-            self._label(panel, "ID ученика: Присваивается автоматически").place(x=20, y=61)
+            self._label(panel, "ID ученика: Присваивается автоматически").place(
+                x=20, y=61
+            )
         self._label(panel, title, 24).place(x=20, y=20)
         self._label(panel, "Статус").place(x=20, y=status_y)
         self.status = FormInput(panel, family, "Выберите", ["Активный", "Архивный"])
@@ -123,9 +150,13 @@ class StudentForm(tk.Frame):
         self.status.place(x=20, y=status_y + 24, width=190, height=32)
 
         self.canvas = tk.Canvas(panel, bg="#6b6b6b", highlightthickness=0)
-        self.canvas.place(x=20, y=body_y, relwidth=1, width=-54, relheight=1, height=-body_y - 61)
+        self.canvas.place(
+            x=20, y=body_y, relwidth=1, width=-54, relheight=1, height=-body_y - 61
+        )
         scrollbar = tk.Scrollbar(panel, command=self.canvas.yview)
-        scrollbar.place(relx=1, x=-32, y=body_y, width=12, relheight=1, height=-body_y - 61)
+        scrollbar.place(
+            relx=1, x=-32, y=body_y, width=12, relheight=1, height=-body_y - 61
+        )
         self.canvas.configure(yscrollcommand=scrollbar.set)
         self.body = tk.Frame(self.canvas, bg="#6b6b6b")
         self.window = self.canvas.create_window(0, 0, window=self.body, anchor="nw")
@@ -168,41 +199,72 @@ class StudentForm(tk.Frame):
         self.original_data = self._get_data()
 
     def _label(self, parent, text, size=14):
+        """Размещение подписи на форме."""
         return tk.Label(
-            parent, text=text, font=(self.family, -size),
-            bg="#6b6b6b", fg="white", anchor="w", padx=0, pady=0
+            parent,
+            text=text,
+            font=(self.family, -size),
+            bg="#6b6b6b",
+            fg="white",
+            anchor="w",
+            padx=0,
+            pady=0,
         )
 
     def _heading(self, parent, text):
+        """Размещение заголовка раздела формы."""
         self._label(parent, text, 16).pack(anchor="w", pady=(0, 8))
 
     def _button(self, parent, text, command):
+        """Создание кнопки с обработчиком нажатия."""
         return tk.Button(
-            parent, text=text, command=command, font=(self.family, -14),
-            bg="#d9d9d9", fg="black", relief="flat", borderwidth=0,
-            cursor="hand2", pady=6
+            parent,
+            text=text,
+            command=command,
+            font=(self.family, -14),
+            bg="#d9d9d9",
+            fg="black",
+            relief="flat",
+            borderwidth=0,
+            cursor="hand2",
+            pady=6,
         )
 
     def _scroll(self, event=None):
+        """Обновление области прокрутки формы."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _resize(self, event):
+        """Подстройка содержимого под размер окна."""
         self.canvas.itemconfigure(self.window, width=event.width)
 
     def _contacts(self, parent, is_parent):
+        """Создание полей имени, телефона и мессенджера."""
         row = tk.Frame(parent, bg="#6b6b6b")
         row.pack(fill="x", pady=(0, 8))
         names = ["ФИО", "Телефон ученика", "Мессенджер", "Контакт в мессенджере"]
         widths = [318, 218, 190, 330]
         if is_parent:
-            names = ["ФИО родителя", "Телефон родителя", "Мессенджер", "Контакт в мессенджере"]
+            names = [
+                "ФИО родителя",
+                "Телефон родителя",
+                "Мессенджер",
+                "Контакт в мессенджере",
+            ]
             widths = [318, 196, 130, 260]
-        hints = ["Введите ФИО", "Номер телефона", "Выберите", "Имя пользователя или телефон"]
+        hints = [
+            "Введите ФИО",
+            "Номер телефона",
+            "Выберите",
+            "Имя пользователя или телефон",
+        ]
         keys = ["full_name", "phone", "messenger_type", "messenger_contact"]
         fields = {}
         for column in range(4):
             row.columnconfigure(column, weight=widths[column], uniform="fields")
-            self._label(row, names[column]).grid(row=0, column=column, sticky="w", pady=(0, 6))
+            self._label(row, names[column]).grid(
+                row=0, column=column, sticky="w", pady=(0, 6)
+            )
             choices = None
             if column == 2:
                 choices = ["", "Telegram", "MAX", "WhatsApp", "Viber", "Другое"]
@@ -213,14 +275,22 @@ class StudentForm(tk.Frame):
             row.columnconfigure(4, weight=140, uniform="fields")
             self._label(row, "Основной контакт").grid(row=0, column=4, sticky="w")
             tk.Radiobutton(
-                row, text="Да", variable=self.primary, value=len(self.parents),
-                bg="#6b6b6b", fg="white", selectcolor="#6b6b6b",
-                activebackground="#6b6b6b", activeforeground="white",
-                font=(self.family, -14), highlightthickness=0
+                row,
+                text="Да",
+                variable=self.primary,
+                value=len(self.parents),
+                bg="#6b6b6b",
+                fg="white",
+                selectcolor="#6b6b6b",
+                activebackground="#6b6b6b",
+                activeforeground="white",
+                font=(self.family, -14),
+                highlightthickness=0,
             ).grid(row=1, column=4, sticky="w")
         return fields
 
     def add_parent(self, data=None):
+        """Добавление строки контактов родителя."""
         fields = self._contacts(self.parent_area, True)
         self.parents.append(fields)
         self.parent_ids.append(None if data is None else data["parent_id"])
@@ -231,20 +301,31 @@ class StudentForm(tk.Frame):
                 self.primary.set(len(self.parents) - 1)
 
     def add_direction(self, data=None):
+        """Добавление строки предмета, цели и тарифа."""
         row = tk.Frame(self.direction_area, bg="#6b6b6b")
         row.pack(fill="x", pady=(0, 8))
         labels = ["Предмет", "Цель подготовки", "Цена за 60 минут, ₽"]
-        hints = ["Введите название предмета", "Выберите цель подготовки", "Введите цену в рублях"]
+        hints = [
+            "Введите название предмета",
+            "Выберите цель подготовки",
+            "Введите цену в рублях",
+        ]
         widths = [396, 396, 276]
         fields = []
         for column in range(3):
             row.columnconfigure(column, weight=widths[column], uniform="fields")
-            self._label(row, labels[column]).grid(row=0, column=column, sticky="w", pady=(0, 6))
+            self._label(row, labels[column]).grid(
+                row=0, column=column, sticky="w", pady=(0, 6)
+            )
             choices = None
             if column == 1:
                 choices = [
-                    "", "ОГЭ", "ЕГЭ", "Повышение успеваемости (ПУ)",
-                    "Подготовка к олимпиаде", "Другое"
+                    "",
+                    "ОГЭ",
+                    "ЕГЭ",
+                    "Повышение успеваемости (ПУ)",
+                    "Подготовка к олимпиаде",
+                    "Другое",
                 ]
             field = FormInput(row, self.family, hints[column], choices)
             field.grid(row=1, column=column, sticky="ew", padx=(0, 12))
@@ -257,6 +338,7 @@ class StudentForm(tk.Frame):
             fields[2].set(data["price"])
 
     def _get_data(self):
+        """Сбор значений формы для сохранения карточки."""
         student = {}
         for key, field in self.student.items():
             student[key] = field.get()
@@ -271,21 +353,26 @@ class StudentForm(tk.Frame):
             parents.append(parent)
         directions = []
         for number, fields in enumerate(self.directions):
-            directions.append({
-                "subject_name": fields[0].get(),
-                "enrollment_id": self.enrollment_ids[number],
-                "preparation_goal": fields[1].get(),
-                "price": fields[2].get()
-            })
+            directions.append(
+                {
+                    "subject_name": fields[0].get(),
+                    "enrollment_id": self.enrollment_ids[number],
+                    "preparation_goal": fields[1].get(),
+                    "price": fields[2].get(),
+                }
+            )
         return {"student": student, "parents": parents, "enrollments": directions}
 
     def _save(self):
+        """Передача заполненных данных обработчику сохранения."""
         self.on_save(self._get_data())
 
     def _lookup(self, event=None):
+        """Поиск существующей карточки по введённому ID."""
         self.on_lookup(self.lookup.get())
 
     def has_changes(self):
+        """Проверка изменений относительно исходной карточки."""
         return self._get_data() != self.original_data
 
     def _fill(self, record):
